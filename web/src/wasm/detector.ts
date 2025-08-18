@@ -13,9 +13,9 @@ export class Detector {
     if (this.mode === 'wasm') {
       ort.env.wasm.numThreads = 1
       ort.env.wasm.simd = true
+      const modelUrl = `${location.protocol}//${location.hostname}:8000/model`
       this.session = await ort.InferenceSession.create(
-        // Tiny yolov5n exported to onnx (remote URL)
-        'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.onnx',
+        modelUrl,
         { executionProviders: ['wasm'] }
       )
     } else {

@@ -2,14 +2,17 @@ import express from 'express'
 import { WebSocketServer } from 'ws'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import QRCode from 'qrcode'
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 app.use(express.json({ limit: '1mb' }))
 
 // Serve built client
 app.use(express.static(path.join(__dirname, 'dist')))
+
+// expose MODE to browser
+app.get('/env.js', (req, res) => {
+  res.type('application/javascript').send(`window.MODE="${process.env.MODE || 'wasm'}";`)
+})
 
 // Inject MODE to window
 app.get('/', (req, res, next) => {
@@ -22,6 +25,14 @@ let metrics = { mode: process.env.MODE || 'wasm', e2e: [], fps: [], kb_up: 0, kb
 
 app.post('/api/bench/reset', (req, res) => {
   metrics = { mode: req.body?.mode || (process.env.MODE||'wasm'), e2e: [], fps: [], kb_up:0, kb_down:0, lastDump: Date.now() }
+  res.json({ ok: true })
+})
+app.post('/api/bench/push', (req, res) => {
+  const { e2e, fps, kbps_up, kbps_down } = req.body || {}
+  if (typeof e2e === 'number') metrics.e2e.push(e2e)
+  if (typeof fps === 'number') metrics.fps.push(fps)
+  if (typeof kbps_up === 'number') metrics.kb_up = kbps_up/8
+  if (typeof kbps_down === 'number') metrics.kb_down = kbps_down/8
   res.json({ ok: true })
 })
 app.get('/api/bench/dump', (req, res) => {

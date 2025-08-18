@@ -149,12 +149,11 @@ async function initViewer(app: HTMLElement) {
   const metrics = {
     e2e_samples: [] as number[],
     fps_samples: [] as number[],
-    bytes_up: 0,
-    bytes_down: 0,
     lastFrameTime: performance.now(),
     processedFrames: 0,
     start: Date.now(),
-    mode: MODE
+    mode: MODE,
+    lastPush: 0
   }
 
   function drawBoxes(dets: any[]) {
@@ -208,8 +207,9 @@ async function initViewer(app: HTMLElement) {
         const idx = Math.floor(0.95*(s.length-1))
         return s[idx]
       }
-      const kbps_up = detector.bytesUp / 1024 * 8
-      const kbps_down = detector.bytesDown / 1024 * 8
+      const elapsed = (Date.now() - metrics.start) / 1000
+      const kbps_up = (detector.bytesUp / 1024) / elapsed * 8
+      const kbps_down = (detector.bytesDown / 1024) / elapsed * 8
       mpre.textContent = JSON.stringify({
         processed_fps: median(metrics.fps_samples).toFixed(1),
         e2e_ms_median: Math.round(median(metrics.e2e_samples)),
@@ -218,6 +218,16 @@ async function initViewer(app: HTMLElement) {
         kbps_down: Math.round(kbps_down),
         samples: metrics.e2e_samples.length
       }, null, 2)
+
+      // push to server ~1Hz for bench metrics
+      if (Date.now() - metrics.lastPush > 1000) {
+        metrics.lastPush = Date.now()
+        fetch('/api/bench/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ e2e, fps, kbps_up, kbps_down })
+        }).catch(()=>{})
+      }
     }
     setTimeout(loop, 70) // ~14 FPS target
   }

@@ -1,11 +1,18 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
 import io, base64, time, json, os
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load labels
 with open("labels_coco80.txt", "r", encoding="utf-8") as f:
@@ -31,6 +38,11 @@ def _ensure_model():
     _session = ort.InferenceSession(MODEL_PATH, providers=providers)
     _input_name = _session.get_inputs()[0].name
     print("Model loaded.", flush=True)
+
+@app.get("/model")
+def get_model():
+    _ensure_model()
+    return FileResponse(MODEL_PATH, media_type="application/octet-stream")
 
 def preprocess(img: Image.Image, size=320):
     img = img.convert("RGB").resize((size, size))

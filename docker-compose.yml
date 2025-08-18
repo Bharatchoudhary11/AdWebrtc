@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        - MODE=${MODE:-wasm}
+    environment:
+      - MODE=${MODE:-wasm}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./shared:/app/shared
+    depends_on:
+      - server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - OT_INTRA_OP_NUM_THREADS=1
+      - OT_INTER_OP_NUM_THREADS=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./shared:/app/shared

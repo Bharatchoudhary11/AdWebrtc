@@ -1,0 +1,6 @@
+web/node_modules/
+web/dist/
+shared/metrics.json
+server/__pycache__/
+bench/__pycache__/
+.DS_Store

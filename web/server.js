@@ -4,18 +4,24 @@ import path from 'path'
 import http from 'http'
 import { fileURLToPath } from 'url'
 import getPort, { portNumbers } from 'get-port'
+import mime from 'mime'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 app.use(express.json({ limit: '1mb' }))
 
+app.use((req, res, next) => {
+  if (req.path.endsWith('.onnx')) {
+    // Always use application/octet-stream for .onnx
+    res.type('application/octet-stream');
+  }
+  next();
+});
+
 // Serve built client
 app.use(express.static(path.join(__dirname, 'dist')))
-
-// Serve static files from public/
-app.use(express.static('public'))
-
+app.use(express.static(path.join(__dirname, 'public')))
 // expose MODE to browser
 app.get('/env.js', (req, res) => {
   const mode = process.env.MODE || 'wasm'
@@ -85,3 +91,4 @@ httpServer.listen(port, '0.0.0.0', () => {
 httpServer.on('error', (err) => {
   console.error('[web] server error:', err)
 })
+

@@ -70,6 +70,10 @@ app = web.Application()
 app.router.add_get("/", index)
 app.router.add_get("/health", health)
 app.router.add_post("/offer", offer)
+
+
+import aiohttp.web
+
 app.on_shutdown.append(on_shutdown)
 
 

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
+import urllib.request
 
 
 class Detector:
@@ -14,6 +15,13 @@ class Detector:
             model_path: Path to ONNX model. Defaults to models/yolov5n.onnx.
         """
         self.model_path = model_path or os.getenv("MODEL_PATH", "models/yolov5n.onnx")
+        if not os.path.exists(self.model_path):
+            os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
+            print("Downloading YOLOv5n model...")
+            urllib.request.urlretrieve(
+                "https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.onnx",
+                self.model_path,
+            )
         providers = ["CPUExecutionProvider"]
         self.session = ort.InferenceSession(self.model_path, providers=providers)
         self.input_name = self.session.get_inputs()[0].name

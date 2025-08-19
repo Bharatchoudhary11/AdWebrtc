@@ -13,6 +13,9 @@ app.use(express.json({ limit: '1mb' }))
 // Serve built client
 app.use(express.static(path.join(__dirname, 'dist')))
 
+// Serve static files from public/
+app.use(express.static('public'))
+
 // expose MODE to browser
 app.get('/env.js', (req, res) => {
   const mode = process.env.MODE || 'wasm'

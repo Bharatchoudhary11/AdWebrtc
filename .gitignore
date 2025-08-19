@@ -6,3 +6,4 @@ bench/__pycache__/
 models/*.onnx
 ngrok.log
 .DS_Store
+web/public/join.txt

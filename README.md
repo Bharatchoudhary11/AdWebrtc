@@ -6,6 +6,12 @@ One-line goal: real-time multi-object detection on live video streamed from a ph
 - **WASM mode (default):** on-device inference in the laptop browser using `onnxruntime-web` (quantized model, 320×320, ~10–15 FPS).
 - **Server mode:** laptop browser samples frames and sends to Python server (CPU ONNX Runtime). Server returns per-frame results via WebSocket.
 
+## Docker & Compose
+```bash
+docker compose up --build
+```
+This exposes the Vite app at http://localhost:3000 and the AIORTC backend at http://localhost:8000. For remote phone access over HTTPS, run a tunnel such as `ngrok http 3000` and use the forwarded URL.
+
 ## One-command start
 ```bash
 git clone <this-repo>

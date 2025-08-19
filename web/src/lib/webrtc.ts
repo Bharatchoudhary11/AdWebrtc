@@ -25,7 +25,8 @@ export async function initWebRTC(
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  const res = await fetch('/offer', {
+  const serverUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
+  const res = await fetch(`${serverUrl}/offer`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/sdp' },
     body: offer.sdp || ''

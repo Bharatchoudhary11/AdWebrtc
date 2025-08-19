@@ -27,14 +27,20 @@ export function initApp() {
     </div>
   `
 
-  // QR
-  const url = new URL(location.href)
+  // QR uses HOST_IP if provided so phones can reach the laptop
+  const hostIp = (window as any).HOST_IP
+  let base = location.origin
+  if (hostIp) {
+    const port = location.port ? `:${location.port}` : ''
+    base = `${location.protocol}//${hostIp}${port}`
+  }
+  const url = new URL(base)
   url.searchParams.set('role', 'camera')
   QRCode.toCanvas(url.toString(), { width: 220 }, (err, canvas) => {
     if (!err) document.getElementById('qr')!.appendChild(canvas)
   })
   document.getElementById('joinCamera')!.onclick = () => {
-    const u = new URL(location.href); u.searchParams.set('role','camera'); location.href = u.toString()
+    const u = new URL(base); u.searchParams.set('role','camera'); location.href = u.toString()
   }
 
   const role = new URLSearchParams(location.search).get('role') || 'viewer'

@@ -9,9 +9,13 @@ app.use(express.json({ limit: '1mb' }))
 // Serve built client
 app.use(express.static(path.join(__dirname, 'dist')))
 
-// expose MODE to browser
+// expose MODE and HOST_IP to browser
 app.get('/env.js', (req, res) => {
-  res.type('application/javascript').send(`window.MODE="${process.env.MODE || 'wasm'}";`)
+  const mode = process.env.MODE || 'wasm'
+  const hostIp = process.env.HOST_IP || ''
+  res
+    .type('application/javascript')
+    .send(`window.MODE="${mode}";window.HOST_IP="${hostIp}";`)
 })
 
 // Inject MODE to window

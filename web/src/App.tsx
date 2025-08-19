@@ -5,6 +5,7 @@ import StatsPanel from './components/StatsPanel';
 import { Metrics } from './lib/metrics';
 import { Detection } from './lib/overlay';
 import { initWebRTC } from './lib/webrtc';
+import { warmup, infer } from './lib/wasm_infer';
 
 const MODE = import.meta.env.VITE_MODE as 'wasm' | 'server';
 
@@ -15,7 +16,6 @@ export default function App() {
   const metricsRef = useRef(new Metrics());
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const workerRef = useRef<Worker>();
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const workerBusy = useRef(false);
   const frameCountRef = useRef(0);
@@ -31,6 +31,10 @@ export default function App() {
         },
         audio: false
       };
+      if (!navigator.mediaDevices?.getUserMedia) {
+        console.error('getUserMedia is not supported in this browser');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
@@ -63,17 +67,7 @@ export default function App() {
   // wasm worker setup
   useEffect(() => {
     if (MODE !== 'wasm') return;
-    const worker = new Worker(new URL('./lib/wasm_infer.ts', import.meta.url), { type: 'module' });
-    workerRef.current = worker;
-    worker.onmessage = ev => {
-      workerBusy.current = false;
-      const { capture_ts, detections } = ev.data;
-      setDetections(detections);
-      metricsRef.current.record(capture_ts, performance.now());
-      frameCountRef.current++;
-    };
-    worker.postMessage({ type: 'init' });
-    return () => worker.terminate();
+    warmup().catch(err => console.error(err));
   }, []);
 
   // frame capture loop for wasm mode
@@ -85,12 +79,20 @@ export default function App() {
     let last = 0;
     const loop = async (now: number) => {
       if (!active) return;
-      if (now - last > interval && workerRef.current && !workerBusy.current) {
+      if (now - last > interval && !workerBusy.current) {
         last = now;
         const bitmap = await captureFrame();
         if (bitmap) {
           workerBusy.current = true;
-          workerRef.current.postMessage({ type: 'frame', image: bitmap, ts: performance.now() }, [bitmap]);
+          infer(bitmap).then(({ capture_ts, inference_ts, detections }) => {
+            workerBusy.current = false;
+            setDetections(detections);
+            metricsRef.current.record(capture_ts, inference_ts);
+            frameCountRef.current++;
+          }).catch(err => {
+            workerBusy.current = false;
+            console.error(err);
+          });
         }
       }
       requestAnimationFrame(loop);

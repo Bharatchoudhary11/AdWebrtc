@@ -38,9 +38,22 @@ if (IS_WORKER) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore - the env object is only checked at runtime.
       ort.env.wasm.numThreads = 1;
-      session = await ort.InferenceSession.create(MODEL_URL, {
-        executionProviders: ['wasm']
-      });
+      try {
+        const response = await fetch(MODEL_URL);
+        if (!response.ok) {
+          throw new Error(`Model fetch failed with ${response.status} ${response.statusText}`);
+        }
+        const buffer = await response.arrayBuffer();
+        if (!buffer.byteLength) {
+          throw new Error(`Model at ${MODEL_URL} is empty`);
+        }
+        session = await ort.InferenceSession.create(buffer, {
+          executionProviders: ['wasm']
+        });
+      } catch (err) {
+        console.error('Failed to initialize ONNX model', err);
+        throw err;
+      }
     }
     return session;
   }

@@ -12,15 +12,16 @@ export class Metrics {
     this.latencies.push(latency);
     // Best-effort push to backend bench aggregator. Ignore failures so normal
     // operation is unaffected if the endpoint is missing (e.g. outside bench
-    // runs).
-    try {
+    // runs). Only attempt this when building for production to avoid noisy
+    // errors during local development.
+    if (import.meta.env.PROD) {
       void fetch('/api/bench/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ e2e: latency })
+      }).catch(() => {
+        /* no-op */
       });
-    } catch {
-      // no-op
     }
   }
 

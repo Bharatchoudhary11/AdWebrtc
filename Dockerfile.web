@@ -1,26 +1,15 @@
 # syntax=docker/dockerfile:1
 ARG TARGETPLATFORM
-FROM --platform=$TARGETPLATFORM node:18-bullseye
-
+FROM --platform=$TARGETPLATFORM node:18-bullseye AS build
 WORKDIR /app
-
-# deps
 COPY web/package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-# project files
-COPY web/vite.config.ts ./
-COPY web/tsconfig.json ./
-COPY web/index.html ./index.html
-COPY web/public ./public
-COPY web/src ./src
-
-ARG MODE=wasm
-ENV MODE=$MODE
-# build
+RUN npm ci
+COPY web/ ./
 RUN npm run build
 
-# serve
-COPY web/server.js ./
+FROM --platform=$TARGETPLATFORM node:18-alpine
+WORKDIR /app
+RUN npm install -g http-server
+COPY --from=build /app/dist ./dist
 EXPOSE 3000
-CMD ["node","server.js"]
+CMD ["http-server", "dist", "-p", "3000", "-a", "0.0.0.0"]

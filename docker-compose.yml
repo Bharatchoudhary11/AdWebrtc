@@ -4,24 +4,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-      args:
-        - MODE=${MODE:-wasm}
-    environment:
-      - MODE=${MODE:-wasm}
     ports:
       - "3000:3000"
-    volumes:
-      - ./bench:/app/bench
     depends_on:
       - server
+    networks:
+      - appnet
   server:
     build:
       context: .
       dockerfile: Dockerfile.server
-    environment:
-      - OT_INTRA_OP_NUM_THREADS=1
-      - OT_INTER_OP_NUM_THREADS=1
     ports:
       - "8000:8000"
-    volumes:
-      - ./models:/app/models
+    networks:
+      - appnet
+networks:
+  appnet:
+    driver: bridge

@@ -6,8 +6,13 @@ import type { Detection } from './overlay';
 // Shared constants and helpers
 // ---------------------------------------------------------------------------
 
-/** Location of the tiny quantised model used for inference. */
-const MODEL_URL = '/models/yolov5n.onnx';
+/**
+ * Location of the tiny quantised model used for inference.
+ *
+ * Use a URL relative to this script so the model can be fetched correctly
+ * whether the application is hosted at the domain root or under a sub-path.
+ */
+const MODEL_URL = new URL(/* @vite-ignore */ '../models/yolov5n.onnx', import.meta.url).toString();
 
 /** Dimensions expected by the model. */
 const SIZE = { width: 320, height: 240 } as const;

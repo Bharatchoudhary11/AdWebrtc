@@ -2,116 +2,142 @@ import * as ort from 'onnxruntime-web';
 import type { InferenceSession, Tensor } from 'onnxruntime-web';
 import type { Detection } from './overlay';
 
-// Shared constants
+// ---------------------------------------------------------------------------
+// Shared constants and helpers
+// ---------------------------------------------------------------------------
+
+/** Location of the tiny quantised model used for inference. */
 const MODEL_URL = '/models/yolov5n.onnx';
+
+/** Dimensions expected by the model. */
 const SIZE = { width: 320, height: 240 } as const;
 
 // ---------------------------------------------------------------------------
 // Worker implementation
 // ---------------------------------------------------------------------------
 
-// Detect if this code is executing inside a Worker. Vite will bundle this file
-// both for the main thread and for the worker itself. When running in the
-// worker we don't have a `document` object available.
-const IS_WORKER = typeof self !== 'undefined' && (self as any).document === undefined;
+// Detect if this code is executing inside a Worker. Vite bundles this file twice:
+// once for the main thread and once for the worker. In the worker we don't have
+// a `document` object available.
+const IS_WORKER = typeof self !== 'undefined' &&
+  (self as any).document === undefined;
 
 if (IS_WORKER) {
   const ctx: DedicatedWorkerGlobalScope = self as any;
 
+  // -------------------------------------------------------------------------
+  // Session management
+  // -------------------------------------------------------------------------
+
   let session: InferenceSession | null = null;
 
-  // Load ONNXRuntime and the model. We explicitly request the WASM backend.
-  async function initSession() {
+  /** Lazily create the ONNXRuntime session using the WASM backend. */
+  async function getSession(): Promise<InferenceSession> {
     if (!session) {
-      // Ensure wasm backend is used.
-      // @ts-ignore - executionProviders is only checked at runtime
+      // Force WASM backend.
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - the env object is only checked at runtime.
       ort.env.wasm.numThreads = 1;
       session = await ort.InferenceSession.create(MODEL_URL, {
         executionProviders: ['wasm']
       });
     }
+    return session;
   }
 
-  function preprocess(image: ImageBitmap | OffscreenCanvas): Tensor {
-    const off = new OffscreenCanvas(SIZE.width, SIZE.height);
-    const ctx2 = off.getContext('2d')!;
-    ctx2.drawImage(image as any, 0, 0, SIZE.width, SIZE.height);
-    const img = ctx2.getImageData(0, 0, SIZE.width, SIZE.height).data;
-    const data = new Float32Array(SIZE.width * SIZE.height * 3);
-    const stride = SIZE.width * SIZE.height;
-    for (let i = 0; i < stride; i++) {
-      data[i] = img[i * 4] / 255;
-      data[i + stride] = img[i * 4 + 1] / 255;
-      data[i + stride * 2] = img[i * 4 + 2] / 255;
+  // -------------------------------------------------------------------------
+  // Pre/post processing helpers
+  // -------------------------------------------------------------------------
+
+  /** Convert an ImageBitmap/OffscreenCanvas to the model input tensor. */
+  function preprocess(src: ImageBitmap | OffscreenCanvas): Tensor {
+    const canvas = new OffscreenCanvas(SIZE.width, SIZE.height);
+    const c = canvas.getContext('2d')!;
+    c.drawImage(src as any, 0, 0, SIZE.width, SIZE.height);
+    const rgba = c.getImageData(0, 0, SIZE.width, SIZE.height).data;
+
+    const pixelCount = SIZE.width * SIZE.height;
+    const data = new Float32Array(pixelCount * 3);
+    for (let i = 0; i < pixelCount; i++) {
+      data[i] = rgba[i * 4] / 255; // R
+      data[i + pixelCount] = rgba[i * 4 + 1] / 255; // G
+      data[i + pixelCount * 2] = rgba[i * 4 + 2] / 255; // B
     }
     return new ort.Tensor('float32', data, [1, 3, SIZE.height, SIZE.width]);
   }
 
-  function postprocess(data: Float32Array): Detection[] {
-    const dets: Detection[] = [];
-    const count = data.length / 85; // YOLO output shape
-    for (let i = 0; i < count; i++) {
-      const off = i * 85;
-      const obj = data[off + 4];
-      let best = 0;
-      let cls = 0;
-      for (let j = 5; j < 85; j++) {
-        const val = data[off + j];
-        if (val > best) {
-          best = val;
-          cls = j - 5;
+  /** Convert YOLO model output to normalized Detection objects. */
+  function postprocess(raw: Float32Array): Detection[] {
+    const stride = 85; // YOLOv5 output layout
+    const results: Detection[] = [];
+    for (let i = 0; i < raw.length; i += stride) {
+      const obj = raw[i + 4];
+      let bestCls = 0;
+      let bestScore = 0;
+      for (let j = 5; j < stride; j++) {
+        const v = raw[i + j];
+        if (v > bestScore) {
+          bestScore = v;
+          bestCls = j - 5;
         }
       }
-      const score = obj * best;
+      const score = obj * bestScore;
       if (score < 0.5) continue;
-      const cx = data[off];
-      const cy = data[off + 1];
-      const w = data[off + 2];
-      const h = data[off + 3];
-      dets.push({
+      const cx = raw[i];
+      const cy = raw[i + 1];
+      const w = raw[i + 2];
+      const h = raw[i + 3];
+      results.push({
         x: (cx - w / 2) / SIZE.width,
         y: (cy - h / 2) / SIZE.height,
         w: w / SIZE.width,
         h: h / SIZE.height,
-        label: String(cls),
+        label: String(bestCls),
         score
       });
     }
-    return dets;
+    return results;
   }
 
-  interface FrameMessage {
+  // -------------------------------------------------------------------------
+  // Worker protocol
+  // -------------------------------------------------------------------------
+
+  interface InferMessage {
+    type: 'infer';
     frame_id: number;
     capture_ts: number;
     bitmap: ImageBitmap | OffscreenCanvas;
   }
+  interface WarmupMessage { type: 'warmup'; }
+  type WorkerRequest = InferMessage | WarmupMessage;
 
   let busy = false;
-  let queued: FrameMessage | null = null;
+  let queued: InferMessage | null = null; // single-slot queue
 
-  function closeBitmap(bm: ImageBitmap | OffscreenCanvas) {
-    if ('close' in bm) (bm as ImageBitmap).close();
+  function closeBitmap(b: ImageBitmap | OffscreenCanvas) {
+    if ('close' in b) (b as ImageBitmap).close();
   }
 
-  async function run(frame: FrameMessage) {
-    await initSession();
-    const input = preprocess(frame.bitmap);
-    const output = await session!.run({ images: input });
-    const out = output[Object.keys(output)[0]] as Tensor;
-    const detections = postprocess(out.data as Float32Array);
+  async function handleInference(msg: InferMessage) {
+    const sess = await getSession();
+    const input = preprocess(msg.bitmap);
+    const outputs = await sess.run({ [sess.inputNames[0]]: input });
+    const tensor = outputs[sess.outputNames[0]] as Tensor;
+    const detections = postprocess(tensor.data as Float32Array);
     const inference_ts = performance.now();
     ctx.postMessage({
-      frame_id: frame.frame_id,
-      capture_ts: frame.capture_ts,
+      frame_id: msg.frame_id,
+      capture_ts: msg.capture_ts,
       inference_ts,
       detections
     });
-    closeBitmap(frame.bitmap);
+    closeBitmap(msg.bitmap);
   }
 
-  async function process(frame: FrameMessage) {
+  async function process(msg: InferMessage) {
     busy = true;
-    await run(frame);
+    await handleInference(msg);
     busy = false;
     if (queued) {
       const next = queued;
@@ -120,26 +146,22 @@ if (IS_WORKER) {
     }
   }
 
-  ctx.onmessage = async ev => {
+  ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     const data = ev.data;
     if (data.type === 'warmup') {
-      await initSession();
-      // run one dummy inference to warm caches
+      const sess = await getSession();
+      // Run a dummy inference to warm up caches
       const zero = new Float32Array(SIZE.width * SIZE.height * 3);
       const tensor = new ort.Tensor('float32', zero, [1, 3, SIZE.height, SIZE.width]);
-      await session!.run({ images: tensor });
+      await sess.run({ [sess.inputNames[0]]: tensor });
       ctx.postMessage({ type: 'warmup-done' });
-    } else if (data.type === 'infer') {
-      const frame: FrameMessage = {
-        frame_id: data.frame_id,
-        capture_ts: data.capture_ts,
-        bitmap: data.bitmap
-      };
+    } else {
+      const msg = data;
       if (busy) {
         if (queued) closeBitmap(queued.bitmap);
-        queued = frame;
+        queued = msg; // replace queued frame
       } else {
-        process(frame);
+        process(msg);
       }
     }
   };
@@ -157,16 +179,14 @@ export interface InferenceOutput {
 }
 
 let worker: Worker | null = null;
-let nextId = 0;
+let nextFrameId = 0;
 const pending = new Map<number, (msg: InferenceOutput) => void>();
 let warmupResolver: (() => void) | null = null;
 
-function getWorker() {
+function getWorker(): Worker {
   if (IS_WORKER) throw new Error('getWorker called inside worker');
   if (!worker) {
-    // Spawn a worker using this very module as the entry script. Use an
-    // indirection for the constructor so that bundlers don't try to process
-    // this worker creation when building the worker itself.
+    // Indirection so bundlers don't evaluate worker creation for worker build.
     const WorkerCtor = Worker as { new (url: string | URL, opts: WorkerOptions): Worker };
     worker = new WorkerCtor(import.meta.url, { type: 'module' });
     worker.onmessage = ev => {
@@ -196,14 +216,11 @@ function warmupImpl(): Promise<void> {
 
 function inferImpl(bitmap: ImageBitmap | OffscreenCanvas): Promise<InferenceOutput> {
   const w = getWorker();
-  const frame_id = nextId++;
+  const frame_id = nextFrameId++;
   const capture_ts = performance.now();
   return new Promise(resolve => {
     pending.set(frame_id, resolve);
-    w.postMessage(
-      { type: 'infer', frame_id, capture_ts, bitmap },
-      [bitmap as any]
-    );
+    w.postMessage({ type: 'infer', frame_id, capture_ts, bitmap }, [bitmap as any]);
   });
 }
 

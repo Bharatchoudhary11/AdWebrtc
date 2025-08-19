@@ -9,22 +9,13 @@ app.use(express.json({ limit: '1mb' }))
 // Serve built client
 app.use(express.static(path.join(__dirname, 'dist')))
 
-// expose MODE and HOST_IP to browser
+// expose MODE to browser
 app.get('/env.js', (req, res) => {
   const mode = process.env.MODE || 'wasm'
-  const hostIp = process.env.HOST_IP || ''
-  res
-    .type('application/javascript')
-    .send(`window.MODE="${mode}";window.HOST_IP="${hostIp}";`)
+  res.type('application/javascript').send(`window.MODE="${mode}";`)
 })
 
-// Inject MODE to window
-app.get('/', (req, res, next) => {
-  // serve index.html with MODE injected is handled by static; nothing custom here
-  next()
-})
-
-// Simple metrics aggregator (browser posts E2E samples via /api/bench endpoints if needed)
+// Simple metrics aggregator
 let metrics = { mode: process.env.MODE || 'wasm', e2e: [], fps: [], kb_up: 0, kb_down: 0, lastDump: 0 }
 
 app.post('/api/bench/reset', (req, res) => {
@@ -51,14 +42,13 @@ app.get('/api/bench/dump', (req, res) => {
     downlink_kbps: Math.round(metrics.kb_down*8),
     ts: Date.now()
   }
-  // write to shared/metrics.json
   import('fs').then(fs => {
-    fs.writeFileSync('/app/shared/metrics.json', JSON.stringify(out, null, 2))
+    fs.writeFileSync('/app/bench/metrics.json', JSON.stringify(out, null, 2))
   })
   res.json({ ok: true, out })
 })
 
-// WebSocket signaling: naive room with 2 peers (camera + viewer)
+// WebSocket signaling
 const server = app.listen(3000, () => {
   console.log('Web server listening on http://0.0.0.0:3000')
 })

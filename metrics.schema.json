@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["mode", "median_e2e_ms", "p95_e2e_ms", "processed_fps_median", "uplink_kbps", "downlink_kbps", "ts"],
+  "properties": {
+    "mode": {"type": "string", "enum": ["wasm", "server"]},
+    "median_e2e_ms": {"type": "number"},
+    "p95_e2e_ms": {"type": "number"},
+    "processed_fps_median": {"type": "number"},
+    "uplink_kbps": {"type": "number"},
+    "downlink_kbps": {"type": "number"},
+    "ts": {"type": "integer"}
+  }
+}

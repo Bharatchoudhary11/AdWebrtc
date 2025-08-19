@@ -8,7 +8,20 @@ export class Metrics {
   private latencies: number[] = [];
 
   record(sent: number, received: number) {
-    this.latencies.push(received - sent);
+    const latency = received - sent;
+    this.latencies.push(latency);
+    // Best-effort push to backend bench aggregator. Ignore failures so normal
+    // operation is unaffected if the endpoint is missing (e.g. outside bench
+    // runs).
+    try {
+      void fetch('/api/bench/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ e2e: latency })
+      });
+    } catch {
+      // no-op
+    }
   }
 
   summary(): MetricSummary {

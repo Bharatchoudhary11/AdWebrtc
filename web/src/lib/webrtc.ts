@@ -1,7 +1,10 @@
 import { Detection } from './overlay';
 
 export interface DetectionMessage {
-  ts: number;
+  frame_id?: number;
+  capture_ts?: number;
+  recv_ts?: number;
+  inference_ts?: number;
   detections: Detection[];
 }
 

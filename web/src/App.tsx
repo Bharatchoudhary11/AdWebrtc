@@ -18,6 +18,7 @@ export default function App() {
   const workerRef = useRef<Worker>();
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const workerBusy = useRef(false);
+  const frameCountRef = useRef(0);
 
   // setup media stream
   useEffect(() => {
@@ -47,7 +48,9 @@ export default function App() {
         }
         pcRef.current = await initWebRTC(stream, msg => {
           setDetections(msg.detections);
-          metricsRef.current.record(msg.ts, performance.now());
+          const sent = msg.capture_ts ?? msg.recv_ts ?? performance.now();
+          metricsRef.current.record(sent, performance.now());
+          frameCountRef.current++;
         });
       }
     })();
@@ -64,9 +67,10 @@ export default function App() {
     workerRef.current = worker;
     worker.onmessage = ev => {
       workerBusy.current = false;
-      const { ts, detections } = ev.data;
+      const { capture_ts, detections } = ev.data;
       setDetections(detections);
-      metricsRef.current.record(ts, performance.now());
+      metricsRef.current.record(capture_ts, performance.now());
+      frameCountRef.current++;
     };
     worker.postMessage({ type: 'init' });
     return () => worker.terminate();
@@ -96,6 +100,48 @@ export default function App() {
       active = false;
     };
   }, [lowRes]);
+
+  // Periodically push FPS and bandwidth stats to bench endpoint
+  useEffect(() => {
+    let lastFrames = 0;
+    const lastBytes = { up: 0, down: 0 };
+    const id = setInterval(() => {
+      const fps = frameCountRef.current - lastFrames;
+      lastFrames = frameCountRef.current;
+      if (pcRef.current) {
+        pcRef.current.getStats().then(stats => {
+          let sent = 0;
+          let recv = 0;
+          stats.forEach(r => {
+            if (r.type === 'outbound-rtp' && (r as any).bytesSent) sent += (r as any).bytesSent;
+            if (r.type === 'inbound-rtp' && (r as any).bytesReceived) recv += (r as any).bytesReceived;
+          });
+          const kbps_up = (sent - lastBytes.up) * 8 / 1000;
+          const kbps_down = (recv - lastBytes.down) * 8 / 1000;
+          lastBytes.up = sent;
+          lastBytes.down = recv;
+          fetch('/api/bench/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fps, kbps_up, kbps_down })
+          }).catch(() => {});
+        }).catch(() => {
+          fetch('/api/bench/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fps })
+          }).catch(() => {});
+        });
+      } else {
+        fetch('/api/bench/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fps })
+        }).catch(() => {});
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const captureFrame = async (): Promise<ImageBitmap | null> => {
     const video = videoRef.current;

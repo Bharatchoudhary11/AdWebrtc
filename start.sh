@@ -1,39 +1,80 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+# Portable script to start the demo environment.
 
-MODE="${MODE:-wasm}"
+set -e
+
+# Ensure we run relative to this script's location
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+MODE=wasm
 NGROK=0
-while [[ $# -gt 0 ]]; do
+
+while [ "$#" -gt 0 ]; do
   case "$1" in
-    --ngrok) NGROK=1; shift ;;
-    *) echo "Unknown arg: $1" >&2; exit 1 ;;
+    --mode)
+      shift
+      if [ "$#" -eq 0 ]; then
+        echo "Missing value for --mode" >&2
+        exit 1
+      fi
+      MODE="$1"
+      if [ "$MODE" != wasm ] && [ "$MODE" != server ]; then
+        echo "Invalid mode: $MODE" >&2
+        exit 1
+      fi
+      shift
+      ;;
+    --ngrok)
+      NGROK=1
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
   esac
 done
 
-export MODE
+JOIN_FILE="$SCRIPT_DIR/web/public/join.txt"
+rm -f "$JOIN_FILE"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker not found. Please install Docker Desktop first." >&2
   exit 1
 fi
 
-# Build and start
-MODE=$MODE docker compose up --build -d
-
-echo "=========================================="
-echo "Demo starting in MODE=$MODE"
-echo "Open http://localhost:3000 on your laptop."
-echo "Scan the QR code to join from your phone."
-echo "=========================================="
-
-if [[ "$NGROK" -eq 1 ]]; then
+if [ "$NGROK" -eq 1 ]; then
   if command -v ngrok >/dev/null 2>&1; then
     echo "Starting ngrok tunnel..."
-    ngrok http 3000 >/tmp/ngrok.log &
-    sleep 2
-    URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -o 'https://[a-z0-9.-]*\.ngrok-free\.app' | head -n1)
-    echo "ngrok URL: ${URL:-check ngrok.log}"
+    (
+      ngrok http 3000 >/tmp/ngrok.log 2>&1 &
+      NGROK_PID=$!
+      URL=""
+      i=0
+      while [ $i -lt 10 ] && [ -z "$URL" ]; do
+        sleep 1
+        URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | \
+          sed -n 's/.*"public_url":"\(https:[^"]*\)".*/\1/p' | head -n 1)
+        i=$((i+1))
+      done
+      if [ -n "$URL" ]; then
+        printf '%s\n' "$URL" > "$JOIN_FILE"
+        echo "ngrok URL: $URL"
+      else
+        echo "Failed to retrieve ngrok URL; check /tmp/ngrok.log" >&2
+      fi
+      wait "$NGROK_PID"
+    ) &
   else
     echo "ngrok not installed; visit https://ngrok.com/" >&2
   fi
 fi
+
+echo "=========================================="
+echo "Demo starting in mode: $MODE"
+echo "Open http://localhost:3000 in your browser."
+echo "Press Ctrl+C to stop. Run 'docker compose down' to clean up."
+echo "=========================================="
+
+VITE_MODE="$MODE" docker compose up --build

@@ -1,6 +1,8 @@
 web/node_modules/
 web/dist/
-shared/metrics.json
+bench/metrics.json
 server/__pycache__/
 bench/__pycache__/
+models/*.onnx
+ngrok.log
 .DS_Store

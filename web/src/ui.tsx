@@ -1,10 +1,13 @@
+import React, { useEffect } from "react"
 import QRCode from 'qrcode'
 import { startSignaling } from './ws-signal'
 import { Detector } from './wasm/detector'
 
 const MODE = (typeof window !== 'undefined' ? (window as any).MODE : undefined) || (import.meta.env.MODE || 'wasm')
 
-export function initApp() {
+export function App() { useEffect(() => { initApp(); }, []); return <div id="app"></div>; }
+
+function initApp() {
   const app = document.getElementById('app')!
   app.innerHTML = `
     <h1>Real-time WebRTC VLM Multi-Object Detection</h1>
@@ -27,13 +30,7 @@ export function initApp() {
     </div>
   `
 
-  // QR uses HOST_IP if provided so phones can reach the laptop
-  const hostIp = (window as any).HOST_IP
-  let base = location.origin
-  if (hostIp) {
-    const port = location.port ? `:${location.port}` : ''
-    base = `${location.protocol}//${hostIp}${port}`
-  }
+  const base = location.origin
   const url = new URL(base)
   url.searchParams.set('role', 'camera')
   QRCode.toCanvas(url.toString(), { width: 220 }, (err, canvas) => {

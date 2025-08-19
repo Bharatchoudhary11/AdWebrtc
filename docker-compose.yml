@@ -2,27 +2,26 @@ version: "3.9"
 services:
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.web
       args:
         - MODE=${MODE:-wasm}
     environment:
       - MODE=${MODE:-wasm}
-      - HOST_IP=${HOST_IP}
     ports:
       - "3000:3000"
     volumes:
-      - ./shared:/app/shared
+      - ./bench:/app/bench
     depends_on:
       - server
   server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.server
     environment:
       - OT_INTRA_OP_NUM_THREADS=1
       - OT_INTER_OP_NUM_THREADS=1
     ports:
       - "8000:8000"
     volumes:
-      - ./shared:/app/shared
+      - ./models:/app/models

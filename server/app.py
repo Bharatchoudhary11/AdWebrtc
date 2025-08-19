@@ -19,7 +19,7 @@ with open("labels_coco80.txt", "r", encoding="utf-8") as f:
     LABELS = [x.strip() for x in f.readlines()]
 
 MODEL_URL = os.environ.get("MODEL_URL", "https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.onnx")
-MODEL_PATH = os.environ.get("MODEL_PATH", "/app/yolov5n.onnx")
+MODEL_PATH = os.environ.get("MODEL_PATH", "/app/models/yolov5n.onnx")
 
 _session = None
 _input_name = None

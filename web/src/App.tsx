@@ -22,6 +22,9 @@ export default function App() {
 
   // setup media stream
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === "undefined" || typeof navigator === "undefined") return;
+
     (async () => {
       const constraints: MediaStreamConstraints = {
         video: {
@@ -31,31 +34,40 @@ export default function App() {
         },
         audio: false
       };
-      if (!navigator.mediaDevices?.getUserMedia) {
+      if (
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
         console.error('getUserMedia is not supported in this browser');
+        setServerDown(true);
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      if (MODE === 'server') {
-        try {
-          const res = await fetch('/health');
-          if (!res.ok) throw new Error('bad');
-        } catch {
-          setServerDown(true);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
         }
-        pcRef.current = await initWebRTC(stream, msg => {
-          setDetections(msg.detections);
-          const sent = msg.capture_ts ?? msg.recv_ts ?? performance.now();
-          metricsRef.current.record(sent, performance.now());
-          frameCountRef.current++;
-        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        if (MODE === 'server') {
+          try {
+            const res = await fetch('/health');
+            if (!res.ok) throw new Error('bad');
+          } catch {
+            setServerDown(true);
+          }
+          pcRef.current = await initWebRTC(stream, msg => {
+            setDetections(msg.detections);
+            const sent = msg.capture_ts ?? msg.recv_ts ?? performance.now();
+            metricsRef.current.record(sent, performance.now());
+            frameCountRef.current++;
+          });
+        }
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        setServerDown(true);
       }
     })();
     return () => {
@@ -147,7 +159,15 @@ export default function App() {
 
   const captureFrame = async (): Promise<ImageBitmap | null> => {
     const video = videoRef.current;
-    if (!video) return null;
+    if (
+      !video ||
+      video.readyState < 2 ||
+      video.videoWidth === 0 ||
+      video.videoHeight === 0
+    ) {
+      console.warn('Video not ready for drawImage', video);
+      return null;
+    }
     const canvas = document.createElement('canvas');
     const w = lowRes ? 320 : video.videoWidth;
     const h = lowRes ? 240 : video.videoHeight;
@@ -171,6 +191,8 @@ export default function App() {
   };
 
   const url = window.location.href;
+
+  console.log('navigator.mediaDevices:', navigator && navigator.mediaDevices);
 
   return (
     <div>

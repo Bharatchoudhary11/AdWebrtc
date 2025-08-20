@@ -18,6 +18,10 @@ async def index(request):
 async def health(request):
     return web.json_response({"ok": True})
 
+async def favicon(request):
+    icon_path = os.path.join(os.path.dirname(__file__), "favicon.ico")
+    return web.FileResponse(icon_path)
+
 
 async def offer(request):
     params = await request.json()
@@ -84,6 +88,7 @@ app = web.Application()
 app.router.add_get("/", index)
 app.router.add_get("/health", health)
 app.router.add_post("/offer", offer)
+app.router.add_get("/favicon.ico", favicon)
 
 
 import aiohttp.web

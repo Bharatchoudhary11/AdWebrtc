@@ -1,7 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["e2e_latency_ms", "processed_fps", "uplink_kbps", "downlink_kbps"],
+  "required": [
+    "e2e_latency_ms",
+    "server_latency_ms",
+    "network_latency_ms",
+    "processed_fps",
+    "uplink_kbps",
+    "downlink_kbps"
+  ],
   "properties": {
     "e2e_latency_ms": {
       "type": "object",
@@ -13,6 +20,22 @@
           "type": "array",
           "items": {"type": "number"}
         }
+      }
+    },
+    "server_latency_ms": {
+      "type": "object",
+      "required": ["median", "p95"],
+      "properties": {
+        "median": { "type": "number" },
+        "p95": { "type": "number" }
+      }
+    },
+    "network_latency_ms": {
+      "type": "object",
+      "required": ["median", "p95"],
+      "properties": {
+        "median": { "type": "number" },
+        "p95": { "type": "number" }
       }
     },
     "processed_fps": {"type": "number"},

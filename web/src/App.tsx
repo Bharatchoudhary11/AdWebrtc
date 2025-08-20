@@ -13,6 +13,7 @@ export default function App() {
   const [lowRes, setLowRes] = useState(true);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [serverDown, setServerDown] = useState(false);
+  const [joinUrl, setJoinUrl] = useState(() => window.location.origin);
   const metricsRef = useRef(new Metrics());
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -60,7 +61,19 @@ export default function App() {
           pcRef.current = await initWebRTC(stream, msg => {
             setDetections(msg.detections);
             const sent = msg.capture_ts ?? msg.recv_ts ?? performance.now();
-            metricsRef.current.record(sent, performance.now());
+            const now = performance.now();
+            const serverLatency =
+              typeof msg.inference_ts === 'number' && typeof msg.recv_ts === 'number'
+                ? msg.inference_ts - msg.recv_ts
+                : undefined;
+            const networkLatency =
+              typeof msg.recv_ts === 'number' && typeof msg.capture_ts === 'number'
+                ? msg.recv_ts - msg.capture_ts
+                : undefined;
+            metricsRef.current.record(sent, now, {
+              server: serverLatency,
+              network: networkLatency,
+            });
             frameCountRef.current++;
           });
         }
@@ -189,7 +202,16 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const url = window.location.href;
+  // Prefer a join URL from the server if provided (e.g. ngrok)
+  useEffect(() => {
+    fetch('/join.txt')
+      .then(res => (res.ok ? res.text() : ''))
+      .then(text => {
+        const t = text.trim();
+        if (t) setJoinUrl(t);
+      })
+      .catch(() => {});
+  }, []);
 
   console.log('navigator.mediaDevices:', navigator && navigator.mediaDevices);
 
@@ -213,7 +235,7 @@ export default function App() {
         <button onClick={saveMetrics}>Save metrics</button>
       </div>
       <StatsPanel metrics={metricsRef.current.summary()} />
-      <QRJoin url={url} />
+      <QRJoin url={joinUrl} />
     </div>
   );
 }

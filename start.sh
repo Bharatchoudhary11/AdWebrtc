@@ -1,5 +1,7 @@
 #!/bin/sh
 # Portable script to start the demo environment.
+# QR codes use the browser's origin; when --ngrok is passed the generated
+# HTTPS URL is written to web/public/join.txt for the client to prefer.
 
 set -e
 
@@ -60,7 +62,7 @@ if [ "$NGROK" -eq 1 ]; then
       done
       if [ -n "$URL" ]; then
         printf '%s\n' "$URL" > "$JOIN_FILE"
-        echo "ngrok URL: $URL"
+        printf 'ngrok URL: %s\n' "$URL"
       else
         echo "Failed to retrieve ngrok URL; check /tmp/ngrok.log" >&2
       fi

@@ -147,20 +147,30 @@ if (IS_WORKER) {
   }
 
   async function handleInference(msg: InferMessage) {
-    const sess = await getSession();
-    const input = preprocess(msg.bitmap);
-    const outputs = await sess.run({ [sess.inputNames[0]]: input });
-    const tensor = outputs[sess.outputNames[0]] as Tensor;
-    const detections = postprocess(tensor.data as Float32Array);
-    const inference_ts = performance.now();
-    ctx.postMessage({
-      type: 'result',
-      frame_id: msg.frame_id,
-      capture_ts: msg.capture_ts,
-      inference_ts,
-      detections
-    });
-    closeBitmap(msg.bitmap);
+    try {
+      const sess = await getSession();
+      const input = preprocess(msg.bitmap);
+      const outputs = await sess.run({ [sess.inputNames[0]]: input });
+      const tensor = outputs[sess.outputNames[0]] as Tensor;
+      const detections = postprocess(tensor.data as Float32Array);
+      const inference_ts = performance.now();
+      ctx.postMessage({
+        type: 'result',
+        frame_id: msg.frame_id,
+        capture_ts: msg.capture_ts,
+        inference_ts,
+        detections
+      });
+    } catch (err) {
+      console.error('Inference failed', err);
+      ctx.postMessage({
+        type: 'error',
+        frame_id: msg.frame_id,
+        message: err instanceof Error ? err.message : String(err)
+      });
+    } finally {
+      closeBitmap(msg.bitmap);
+    }
   }
 
   async function process(msg: InferMessage) {
@@ -177,12 +187,20 @@ if (IS_WORKER) {
   ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     const data = ev.data;
     if (data.type === 'warmup') {
-      const sess = await getSession();
-      // Run a dummy inference to warm up caches
-      const zero = new Float32Array(SIZE.width * SIZE.height * 3);
-      const tensor = new ort.Tensor('float32', zero, [1, 3, SIZE.height, SIZE.width]);
-      await sess.run({ [sess.inputNames[0]]: tensor });
-      ctx.postMessage({ type: 'warmup-done' });
+      try {
+        const sess = await getSession();
+        // Run a dummy inference to warm up caches
+        const zero = new Float32Array(SIZE.width * SIZE.height * 3);
+        const tensor = new ort.Tensor('float32', zero, [1, 3, SIZE.height, SIZE.width]);
+        await sess.run({ [sess.inputNames[0]]: tensor });
+        ctx.postMessage({ type: 'warmup-done' });
+      } catch (err) {
+        console.error('Warmup failed', err);
+        ctx.postMessage({
+          type: 'error',
+          message: err instanceof Error ? err.message : String(err)
+        });
+      }
     } else {
       const msg = data;
       if (busy) {
@@ -234,6 +252,15 @@ function getWorker(): Worker {
           pending.delete(data.frame_id);
           resolver(null);
         }
+      } else if (data.type === 'error') {
+        if (data.frame_id !== undefined) {
+          const resolver = pending.get(data.frame_id);
+          if (resolver) {
+            pending.delete(data.frame_id);
+            resolver(null);
+          }
+        }
+        console.error('Worker error:', data.message);
       } else {
         const resolver = pending.get(data.frame_id);
         if (resolver) {

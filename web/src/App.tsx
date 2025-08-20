@@ -222,8 +222,6 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  console.log('navigator.mediaDevices:', navigator && navigator.mediaDevices);
-
   return (
     <div>
       {serverDown && MODE === 'server' && (

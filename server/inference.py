@@ -27,6 +27,15 @@ class Detector:
         self.input_name = self.session.get_inputs()[0].name
         self.size = (320, 240)  # width, height
 
+        # Load labels for converting class indices to human readable strings.
+        labels_path = os.path.join(os.path.dirname(__file__), "labels_coco80.txt")
+        if os.path.exists(labels_path):
+            with open(labels_path, "r", encoding="utf-8") as f:
+                self.labels = [line.strip() for line in f if line.strip()]
+        else:
+            # Fallback to empty list if labels file is missing.
+            self.labels = []
+
     def _preprocess(self, frame) -> np.ndarray:
         img = frame.to_image().resize(self.size)
         arr = np.array(img).astype(np.float32) / 255.0
@@ -60,9 +69,11 @@ class Detector:
 
         detections = []
         for i in range(len(scores)):
+            idx = int(classes[i])
+            label = self.labels[idx] if 0 <= idx < len(self.labels) else str(idx)
             detections.append(
                 {
-                    "label": int(classes[i]),
+                    "label": label,
                     "score": float(scores[i]),
                     "xmin": float(xmin[i]),
                     "ymin": float(ymin[i]),

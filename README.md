@@ -63,7 +63,7 @@ Run:
 ./bench/run_bench.sh --duration 30 --mode wasm
 # or
 ./bench/run_bench.sh --duration 30 --mode server
-cat bench/metrics.json
+cat bench/metrics.json  # includes median/p95 for e2e, server and network latency
 ```
 
 ---

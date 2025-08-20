@@ -29,6 +29,8 @@ app.get('/env.js', (req, res) => {
 let metrics = {
   mode: process.env.MODE || 'wasm',
   e2e: [],
+  srv: [],
+  net: [],
   fps: [],
   kb_up: { sum: 0, count: 0 },
   kb_down: { sum: 0, count: 0 },
@@ -38,6 +40,8 @@ const benchStart = (req, res) => {
   metrics = {
     mode: req.body?.mode || process.env.MODE || 'wasm',
     e2e: [],
+    srv: [],
+    net: [],
     fps: [],
     kb_up: { sum: 0, count: 0 },
     kb_down: { sum: 0, count: 0 },
@@ -73,6 +77,14 @@ const benchStop = (req, res) => {
       p95: Math.round(p95(metrics.e2e)),
       histogram: buildHist(metrics.e2e),
     },
+    server_latency_ms: {
+      median: Math.round(median(metrics.srv)),
+      p95: Math.round(p95(metrics.srv)),
+    },
+    network_latency_ms: {
+      median: Math.round(median(metrics.net)),
+      p95: Math.round(p95(metrics.net)),
+    },
     processed_fps: Number(median(metrics.fps).toFixed(1)),
     uplink_kbps: Math.round(avg(metrics.kb_up)),
     downlink_kbps: Math.round(avg(metrics.kb_down)),
@@ -87,8 +99,10 @@ app.post('/api/bench/reset', benchStart)
 app.get('/api/bench/dump', benchStop)
 
 app.post('/api/bench/push', (req, res) => {
-  const { e2e, fps, kbps_up, kbps_down } = req.body || {}
+  const { e2e, fps, kbps_up, kbps_down, server_latency_ms, network_latency_ms } = req.body || {}
   if (typeof e2e === 'number') metrics.e2e.push(e2e)
+  if (typeof server_latency_ms === 'number') metrics.srv.push(server_latency_ms)
+  if (typeof network_latency_ms === 'number') metrics.net.push(network_latency_ms)
   if (typeof fps === 'number') metrics.fps.push(fps)
   if (typeof kbps_up === 'number') {
     metrics.kb_up.sum += kbps_up

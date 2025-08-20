@@ -34,8 +34,22 @@ async def offer(request: Request):
     @pc.on("track")
     async def on_track(track):
         if track.kind == "video":
+            queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+
+            async def reader():
+                while True:
+                    frame = await track.recv()
+                    if queue.full():
+                        try:
+                            queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            pass
+                    await queue.put(frame)
+
+            asyncio.create_task(reader())
+
             while True:
-                frame = await track.recv()
+                frame = await queue.get()
                 frame_id = int(frame.pts or 0)
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)

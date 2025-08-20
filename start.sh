@@ -39,7 +39,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 JOIN_FILE="$SCRIPT_DIR/web/public/join.txt"
-rm -f "$JOIN_FILE"
+# Ensure the join file exists to avoid 404s when ngrok isn't used
+: > "$JOIN_FILE"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker not found. Please install Docker Desktop first." >&2

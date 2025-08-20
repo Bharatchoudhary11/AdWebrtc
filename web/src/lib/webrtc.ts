@@ -8,6 +8,11 @@ export interface DetectionMessage {
   detections: Detection[];
 }
 
+// Base URL for the inference server. Using the same value everywhere ensures
+// that the frontend consistently talks to the correct backend port regardless
+// of the current origin (e.g. dev server on 3000).
+export const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
+
 export async function initWebRTC(
   stream: MediaStream,
   onMessage: (msg: DetectionMessage) => void
@@ -25,8 +30,7 @@ export async function initWebRTC(
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  const serverUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
-  const res = await fetch(`${serverUrl}/offer`, {
+  const res = await fetch(`${SERVER_URL}/offer`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/sdp' },
     body: offer.sdp || ''

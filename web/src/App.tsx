@@ -4,7 +4,7 @@ import QRJoin from './components/QRJoin';
 import StatsPanel from './components/StatsPanel';
 import { Metrics } from './lib/metrics';
 import { Detection } from './lib/overlay';
-import { initWebRTC } from './lib/webrtc';
+import { initWebRTC, SERVER_URL } from './lib/webrtc';
 import { warmup, infer } from './lib/wasm_infer';
 
 const MODE = import.meta.env.VITE_MODE as 'wasm' | 'server';
@@ -61,7 +61,7 @@ export default function App() {
         }
         if (MODE === 'server') {
           try {
-            const res = await fetch('/health');
+            const res = await fetch(`${SERVER_URL}/health`);
             if (!res.ok) throw new Error('bad');
           } catch {
             setServerDown(true);

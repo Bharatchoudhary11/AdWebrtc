@@ -10,8 +10,9 @@ const VideoCanvas = forwardRef<HTMLVideoElement, Props>(({ stream, detections },
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
-  const dirtyRef = useRef(false);
+  const offsetRef = useRef(0);
   const rafRef = useRef<number>();
+  const SPEED = 5; // pixels per frame
 
   useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement);
 
@@ -22,41 +23,51 @@ const VideoCanvas = forwardRef<HTMLVideoElement, Props>(({ stream, detections },
   }, [stream]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
     const video = videoRef.current;
-    if (
-      !canvas ||
-      !video ||
-      video.videoWidth === 0 ||
-      video.videoHeight === 0
-    ) {
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
       return;
     }
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
 
-    if (!offscreenRef.current ||
-        offscreenRef.current.width !== canvas.width ||
-        offscreenRef.current.height !== canvas.height) {
-      offscreenRef.current = new OffscreenCanvas(canvas.width, canvas.height);
+    if (
+      !offscreenRef.current ||
+      offscreenRef.current.width !== video.videoWidth ||
+      offscreenRef.current.height !== video.videoHeight
+    ) {
+      offscreenRef.current = new OffscreenCanvas(video.videoWidth, video.videoHeight);
     }
 
     const ctx = offscreenRef.current.getContext('2d');
     if (!ctx) return;
-    drawDetections(ctx, detections, canvas.width, canvas.height);
-    dirtyRef.current = true;
+    ctx.clearRect(0, 0, video.videoWidth, video.videoHeight);
+    drawDetections(ctx, detections, video.videoWidth, video.videoHeight);
   }, [detections]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const render = () => {
-      if (dirtyRef.current && offscreenRef.current) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(offscreenRef.current, 0, 0);
-        dirtyRef.current = false;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (w && h) {
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        offsetRef.current = (offsetRef.current + SPEED) % w;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(video, -offsetRef.current, 0, w, h);
+        if (offsetRef.current > 0) {
+          ctx.drawImage(video, w - offsetRef.current, 0, w, h);
+        }
+        if (offscreenRef.current) {
+          ctx.drawImage(offscreenRef.current, -offsetRef.current, 0);
+          if (offsetRef.current > 0) {
+            ctx.drawImage(offscreenRef.current, w - offsetRef.current, 0);
+          }
+        }
       }
       rafRef.current = requestAnimationFrame(render);
     };
@@ -68,8 +79,8 @@ const VideoCanvas = forwardRef<HTMLVideoElement, Props>(({ stream, detections },
 
   return (
     <div style={{ position: 'relative' }}>
-      <video ref={videoRef} autoPlay playsInline muted style={{ transform: 'scaleX(-1)' }} />
-      <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0 }} />
+      <canvas ref={canvasRef} />
+      <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
     </div>
   );
 });

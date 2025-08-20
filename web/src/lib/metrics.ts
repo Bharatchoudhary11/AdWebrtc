@@ -1,3 +1,5 @@
+import { deviceId } from './device';
+
 export interface MetricSummary {
   count: number;
   p50: number;
@@ -19,7 +21,10 @@ export class Metrics {
     // runs). Only attempt this when building for production to avoid noisy
     // errors during local development.
     if (import.meta.env.PROD) {
-      const payload: Record<string, number> = { e2e: latency };
+      const payload: Record<string, number | string> = {
+        device_id: deviceId,
+        e2e: latency,
+      };
       if (typeof extra?.server === 'number') payload.server_latency_ms = extra.server;
       if (typeof extra?.network === 'number') payload.network_latency_ms = extra.network;
       void fetch('/api/bench/push', {

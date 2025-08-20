@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from inference import Detector
+from tracker import SimpleTracker
 
 app = FastAPI()
 app.add_middleware(
@@ -35,6 +36,7 @@ async def offer(request: Request):
     async def on_track(track):
         if track.kind == "video":
             queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+            tracker = SimpleTracker()
 
             async def reader():
                 while True:
@@ -53,6 +55,7 @@ async def offer(request: Request):
                 frame_id = int(frame.pts or 0)
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
+                detections = tracker.update(detections)
                 inference_ts = int(time.time() * 1000)
                 message = {
                     "frame_id": frame_id,

@@ -6,6 +6,7 @@ import { Metrics } from './lib/metrics';
 import { Detection } from './lib/overlay';
 import { initWebRTC, SERVER_URL } from './lib/webrtc';
 import { warmup, infer } from './lib/wasm_infer';
+import { deviceId } from './lib/device';
 
 const MODE = import.meta.env.VITE_MODE as 'wasm' | 'server';
 
@@ -163,20 +164,20 @@ export default function App() {
           fetch('/api/bench/push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fps, kbps_up, kbps_down })
+            body: JSON.stringify({ device_id: deviceId, fps, kbps_up, kbps_down })
           }).catch(() => {});
         }).catch(() => {
           fetch('/api/bench/push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fps })
+            body: JSON.stringify({ device_id: deviceId, fps })
           }).catch(() => {});
         });
       } else {
         fetch('/api/bench/push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fps })
+          body: JSON.stringify({ device_id: deviceId, fps })
         }).catch(() => {});
       }
     }, 1000);

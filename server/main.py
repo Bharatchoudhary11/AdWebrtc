@@ -54,6 +54,8 @@ async def offer(request):
                 frame_id = int(frame.pts or 0)
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
+                # Print detections so they appear in backend logs
+                print(f"Frame {frame_id} detections: {detections}")
                 inference_ts = int(time.time() * 1000)
                 message = {
                     "frame_id": frame_id,

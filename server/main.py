@@ -62,8 +62,12 @@ async def offer(request):
                 # Print detections so they appear in backend logs
                 print(f"Frame {frame_id} detections: {detections}")
                 inference_ts = int(time.time() * 1000)
+                capture_ts = (
+                    int(frame.time * 1000) if getattr(frame, "time", None) is not None else recv_ts
+                )
                 message = {
                     "frame_id": frame_id,
+                    "capture_ts": capture_ts,
                     "recv_ts": recv_ts,
                     "inference_ts": inference_ts,
                     "detections": detections,

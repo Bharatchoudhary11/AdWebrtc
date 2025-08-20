@@ -53,6 +53,11 @@ export default function App() {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          try {
+            await videoRef.current.play();
+          } catch (err) {
+            console.warn('Failed to play video stream', err);
+          }
         }
         if (MODE === 'server') {
           try {

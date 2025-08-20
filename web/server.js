@@ -19,9 +19,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve built client
-app.use(express.static(path.join(__dirname, 'dist')))
-app.use(express.static(path.join(__dirname, 'public')))
 // expose MODE to browser
 app.get('/env.js', (req, res) => {
   const mode = process.env.MODE || 'wasm'
@@ -65,6 +62,10 @@ app.get('/api/bench/dump', async (req, res) => {
   }
   res.json({ ok: true, out })
 })
+
+// Serve built client after API routes so they aren't shadowed
+app.use(express.static(path.join(__dirname, 'dist')))
+app.use(express.static(path.join(__dirname, 'public')))
 
 // ----- SINGLE HTTP SERVER + WS on same port -----
 const httpServer = http.createServer(app)

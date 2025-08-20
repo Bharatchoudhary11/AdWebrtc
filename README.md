@@ -61,6 +61,13 @@ Then open **http://localhost:3000** on your laptop. A QR code appears — scan i
     ]
   }
   ```
+  The backend also persists these entries per device. The most recent entry
+  for a device can be fetched via HTTP:
+
+  ```bash
+  curl "http://localhost:8000/?device_id=<id>"
+  ```
+  which returns a JSON object in the same format as above.
 - **E2E latency per frame:** `overlay_display_ts - capture_ts`
 - **Server latency:** `inference_ts - recv_ts`
 - **Network latency:** `recv_ts - capture_ts`

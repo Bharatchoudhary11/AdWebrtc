@@ -10,9 +10,7 @@ const VideoCanvas = forwardRef<HTMLVideoElement, Props>(({ stream, detections },
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
-  const offsetRef = useRef(0);
   const rafRef = useRef<number>();
-  const SPEED = 5; // pixels per frame
 
   useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement);
 
@@ -57,17 +55,10 @@ const VideoCanvas = forwardRef<HTMLVideoElement, Props>(({ stream, detections },
           canvas.width = w;
           canvas.height = h;
         }
-        offsetRef.current = (offsetRef.current + SPEED) % w;
         ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(video, -offsetRef.current, 0, w, h);
-        if (offsetRef.current > 0) {
-          ctx.drawImage(video, w - offsetRef.current, 0, w, h);
-        }
+        ctx.drawImage(video, 0, 0, w, h);
         if (offscreenRef.current) {
-          ctx.drawImage(offscreenRef.current, -offsetRef.current, 0);
-          if (offsetRef.current > 0) {
-            ctx.drawImage(offscreenRef.current, w - offsetRef.current, 0);
-          }
+          ctx.drawImage(offscreenRef.current, 0, 0);
         }
       }
       rafRef.current = requestAnimationFrame(render);

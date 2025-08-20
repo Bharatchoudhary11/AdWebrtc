@@ -18,9 +18,17 @@ app.add_middleware(
 pcs = set()
 detector = Detector()
 
+
+@app.get("/")
+async def index():
+    """Basic index route to confirm the server is running."""
+    return {"message": "aiortc inference server"}
+
+
 @app.get("/health")
 async def health():
     return {"ok": True}
+
 
 @app.post("/offer")
 async def offer(request: Request):
@@ -77,6 +85,7 @@ async def offer(request: Request):
     await pc.setLocalDescription(answer)
 
     return Response(pc.localDescription.sdp, media_type="application/sdp")
+
 
 @app.on_event("shutdown")
 async def on_shutdown():

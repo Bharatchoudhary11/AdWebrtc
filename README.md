@@ -48,7 +48,15 @@ Then open **http://localhost:3000** on your laptop. A QR code appears — scan i
     "recv_ts": 1690000000100,
     "inference_ts": 1690000000120,
     "detections": [
-      { "label": "person", "score": 0.93, "xmin": 0.12, "ymin": 0.08, "xmax": 0.34, "ymax": 0.67 }
+      {
+        "id": 1,
+        "label": "person",
+        "score": 0.93,
+        "xmin": 0.12,
+        "ymin": 0.08,
+        "xmax": 0.34,
+        "ymax": 0.67
+      }
     ]
   }
   ```

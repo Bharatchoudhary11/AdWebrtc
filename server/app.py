@@ -30,7 +30,10 @@ async def index(device_id: str | None = None):
                 data = [json.loads(line) for line in f if line.strip()]
             return {"device_id": device_id, "metrics": data}
         return {"device_id": device_id, "metrics": []}
-    return {"message": "aiortc inference server"}
+    return {
+        "message": "aiortc inference server",
+        "hint": "add ?device_id=<id> query parameter to fetch metrics",
+    }
 
 
 @app.get("/health")

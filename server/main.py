@@ -12,7 +12,12 @@ detector = Detector()
 
 
 async def index(request):
-    return web.Response(text="aiortc inference server", content_type="text/html")
+    return web.json_response(
+        {
+            "message": "aiortc inference server",
+            "hint": "add ?device_id=<id> query parameter to fetch metrics",
+        }
+    )
 
 
 async def health(request):

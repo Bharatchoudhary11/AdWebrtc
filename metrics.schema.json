@@ -1,14 +1,23 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["mode", "median_e2e_ms", "p95_e2e_ms", "processed_fps_median", "uplink_kbps", "downlink_kbps", "ts"],
+  "required": ["e2e_latency_ms", "processed_fps", "uplink_kbps", "downlink_kbps"],
   "properties": {
-    "mode": {"type": "string", "enum": ["wasm", "server"]},
-    "median_e2e_ms": {"type": "number"},
-    "p95_e2e_ms": {"type": "number"},
-    "processed_fps_median": {"type": "number"},
+    "e2e_latency_ms": {
+      "type": "object",
+      "required": ["median", "p95"],
+      "properties": {
+        "median": {"type": "number"},
+        "p95": {"type": "number"},
+        "histogram": {
+          "type": "array",
+          "items": {"type": "number"}
+        }
+      }
+    },
+    "processed_fps": {"type": "number"},
     "uplink_kbps": {"type": "number"},
     "downlink_kbps": {"type": "number"},
-    "ts": {"type": "integer"}
+    "mode": {"type": "string", "enum": ["wasm", "server"]}
   }
 }

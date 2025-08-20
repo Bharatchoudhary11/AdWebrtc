@@ -6,12 +6,22 @@ from aiohttp import web
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from inference import Detector
+from tracker import SimpleTracker
 
 pcs = set()
 detector = Detector()
 
 
 async def index(request):
+    """Return server status or metrics for a specific device."""
+    device_id = request.query.get("device_id")
+    if device_id:
+        path = f"{device_id}_metrics.json"
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = [json.loads(line) for line in f if line.strip()]
+            return web.json_response({"device_id": device_id, "metrics": data})
+        return web.json_response({"device_id": device_id, "metrics": []})
     return web.json_response(
         {
             "message": "aiortc inference server",
@@ -29,18 +39,22 @@ async def favicon(request):
 
 
 async def offer(request):
-    params = await request.json()
-    offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+    device_id = request.query.get("device_id")
+    sdp = await request.text()
+    offer = RTCSessionDescription(sdp=sdp, type="offer")
 
     pc = RTCPeerConnection()
     pcs.add(pc)
 
     detections_channel = pc.createDataChannel("detections")
+    metrics_path = f"{device_id}_metrics.json" if device_id else None
+    metrics_file = open(metrics_path, "a", encoding="utf-8") if metrics_path else None
 
     @pc.on("track")
     async def on_track(track):
         if track.kind == "video":
             queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+            tracker = SimpleTracker()
 
             async def reader():
                 while True:
@@ -57,14 +71,13 @@ async def offer(request):
             while True:
                 frame = await queue.get()
                 frame_id = int(frame.pts or 0)
+                capture_ts = int((getattr(frame, "time", 0) or 0) * 1000)
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
-                # Print detections so they appear in backend logs
+                detections = tracker.update(detections)
+                # Log detections for visibility in server output
                 print(f"Frame {frame_id} detections: {detections}")
                 inference_ts = int(time.time() * 1000)
-                capture_ts = (
-                    int(frame.time * 1000) if getattr(frame, "time", None) is not None else recv_ts
-                )
                 message = {
                     "frame_id": frame_id,
                     "capture_ts": capture_ts,
@@ -72,6 +85,9 @@ async def offer(request):
                     "inference_ts": inference_ts,
                     "detections": detections,
                 }
+                if metrics_file:
+                    metrics_file.write(json.dumps(message) + "\n")
+                    metrics_file.flush()
                 if detections_channel.readyState == "open":
                     detections_channel.send(json.dumps(message))
 
@@ -80,14 +96,14 @@ async def offer(request):
         if pc.connectionState in ("failed", "closed"):
             await pc.close()
             pcs.discard(pc)
+            if metrics_file:
+                metrics_file.close()
 
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
-    return web.json_response(
-        {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
-    )
+    return web.Response(text=pc.localDescription.sdp, content_type="application/sdp")
 
 
 async def on_shutdown(app):

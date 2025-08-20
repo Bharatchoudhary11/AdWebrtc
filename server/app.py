@@ -78,8 +78,17 @@ async def offer(request: Request, device_id: str = Query(...)):
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
                 detections = tracker.update(detections)
-                # Log detections for visibility in server output
-                print(f"Frame {frame_id} detections: {detections}")
+                detections = [
+                    {
+                        "label": det["label"],
+                        "score": det["score"],
+                        "xmin": det["xmin"],
+                        "ymin": det["ymin"],
+                        "xmax": det["xmax"],
+                        "ymax": det["ymax"],
+                    }
+                    for det in detections
+                ]
                 inference_ts = int(time.time() * 1000)
                 message = {
                     "frame_id": frame_id,
@@ -88,6 +97,7 @@ async def offer(request: Request, device_id: str = Query(...)):
                     "inference_ts": inference_ts,
                     "detections": detections,
                 }
+                print(json.dumps(message))
                 metrics_file.write(json.dumps(message) + "\n")
                 metrics_file.flush()
                 if detections_channel.readyState == "open":

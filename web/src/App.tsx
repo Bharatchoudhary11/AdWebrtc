@@ -17,7 +17,6 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const workerBusy = useRef(false);
   const frameCountRef = useRef(0);
 
   // setup media stream
@@ -30,7 +29,7 @@ export default function App() {
         video: {
           width: lowRes ? 320 : 640,
           height: lowRes ? 240 : 480,
-          frameRate: lowRes ? 10 : 30
+          frameRate: 30
         },
         audio: false
       };
@@ -86,23 +85,23 @@ export default function App() {
   useEffect(() => {
     if (MODE !== 'wasm') return;
     let active = true;
-    const fps = lowRes ? 10 : 30;
+    const fps = 12; // clamp inference FPS
     const interval = 1000 / fps;
     let last = 0;
     const loop = async (now: number) => {
       if (!active) return;
-      if (now - last > interval && !workerBusy.current) {
+      if (now - last > interval) {
         last = now;
         const bitmap = await captureFrame();
         if (bitmap) {
-          workerBusy.current = true;
-          infer(bitmap).then(({ capture_ts, inference_ts, detections }) => {
-            workerBusy.current = false;
-            setDetections(detections);
-            metricsRef.current.record(capture_ts, inference_ts);
-            frameCountRef.current++;
+          infer(bitmap).then(output => {
+            if (output) {
+              const { capture_ts, inference_ts, detections } = output;
+              setDetections(detections);
+              metricsRef.current.record(capture_ts, inference_ts);
+              frameCountRef.current++;
+            }
           }).catch(err => {
-            workerBusy.current = false;
             console.error(err);
           });
         }

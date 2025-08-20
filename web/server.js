@@ -26,41 +26,79 @@ app.get('/env.js', (req, res) => {
 })
 
 // Simple metrics aggregator
-let metrics = { mode: process.env.MODE || 'wasm', e2e: [], fps: [], kb_up: 0, kb_down: 0, lastDump: 0 }
+let metrics = {
+  mode: process.env.MODE || 'wasm',
+  e2e: [],
+  fps: [],
+  kb_up: { sum: 0, count: 0 },
+  kb_down: { sum: 0, count: 0 },
+}
 
-app.post('/api/bench/reset', (req, res) => {
-  metrics = { mode: req.body?.mode || (process.env.MODE || 'wasm'), e2e: [], fps: [], kb_up: 0, kb_down: 0, lastDump: Date.now() }
+const benchStart = (req, res) => {
+  metrics = {
+    mode: req.body?.mode || process.env.MODE || 'wasm',
+    e2e: [],
+    fps: [],
+    kb_up: { sum: 0, count: 0 },
+    kb_down: { sum: 0, count: 0 },
+  }
   res.json({ ok: true })
-})
+}
+
+const benchStop = (req, res) => {
+  const median = arr => {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+  const p95 = arr => {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const i = Math.floor(0.95 * (s.length - 1));
+    return s[i];
+  }
+  const buildHist = arr => {
+    const bins = Array(20).fill(0);
+    for (const v of arr) {
+      const idx = Math.min(bins.length - 1, Math.floor(v / 50));
+      bins[idx]++;
+    }
+    return bins;
+  }
+  const avg = m => (m.count ? m.sum / m.count : 0);
+  const out = {
+    e2e_latency_ms: {
+      median: Math.round(median(metrics.e2e)),
+      p95: Math.round(p95(metrics.e2e)),
+      histogram: buildHist(metrics.e2e),
+    },
+    processed_fps: Number(median(metrics.fps).toFixed(1)),
+    uplink_kbps: Math.round(avg(metrics.kb_up)),
+    downlink_kbps: Math.round(avg(metrics.kb_down)),
+  }
+  res.json(out)
+}
+
+app.post('/bench-start', benchStart)
+app.get('/bench-stop', benchStop)
+// Compatibility with older scripts
+app.post('/api/bench/reset', benchStart)
+app.get('/api/bench/dump', benchStop)
+
 app.post('/api/bench/push', (req, res) => {
   const { e2e, fps, kbps_up, kbps_down } = req.body || {}
   if (typeof e2e === 'number') metrics.e2e.push(e2e)
   if (typeof fps === 'number') metrics.fps.push(fps)
-  if (typeof kbps_up === 'number') metrics.kb_up = kbps_up / 8
-  if (typeof kbps_down === 'number') metrics.kb_down = kbps_down / 8
+  if (typeof kbps_up === 'number') {
+    metrics.kb_up.sum += kbps_up
+    metrics.kb_up.count++
+  }
+  if (typeof kbps_down === 'number') {
+    metrics.kb_down.sum += kbps_down
+    metrics.kb_down.count++
+  }
   res.json({ ok: true })
-})
-app.get('/api/bench/dump', async (req, res) => {
-  const median = arr => { if (!arr.length) return 0; const s = [...arr].sort((a,b)=>a-b); const m = Math.floor(s.length/2); return s.length%2 ? s[m] : (s[m-1]+s[m])/2 }
-  const p95 = arr => { if (!arr.length) return 0; const s = [...arr].sort((a,b)=>a-b); const i = Math.floor(0.95*(s.length-1)); return s[i] }
-  const out = {
-    mode: metrics.mode,
-    median_e2e_ms: Math.round(median(metrics.e2e)),
-    p95_e2e_ms: Math.round(p95(metrics.e2e)),
-    processed_fps_median: Number(median(metrics.fps).toFixed(1)),
-    uplink_kbps: Math.round(metrics.kb_up * 8),
-    downlink_kbps: Math.round(metrics.kb_down * 8),
-    ts: Date.now()
-  }
-  const fs = await import('fs')
-  try {
-    // fall back to local path if /app/bench/ isn’t mounted
-    const target = fs.existsSync('/app/bench') ? '/app/bench/metrics.json' : path.join(__dirname, 'metrics.json')
-    fs.writeFileSync(target, JSON.stringify(out, null, 2))
-  } catch (e) {
-    console.error('Failed to write metrics:', e)
-  }
-  res.json({ ok: true, out })
 })
 
 // Serve built client after API routes so they aren't shadowed

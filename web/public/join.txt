@@ -1,2 +1,0 @@
-# Default join URL placeholder. This file prevents 404 errors when the server
-# has not written a join URL yet.

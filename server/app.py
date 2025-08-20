@@ -22,14 +22,26 @@ detector = Detector()
 
 @app.get("/")
 async def index(device_id: str | None = None):
-    """Return server status or metrics for a specific device."""
+    """Return server status or the latest metrics for a specific device.
+
+    When ``device_id`` is provided, this endpoint returns the most recent
+    per-frame metrics entry written for that device.  The metrics file is
+    appended to by the ``/offer`` handler and contains one JSON object per
+    line.  If no metrics are available yet for the device, an empty object is
+    returned.  When ``device_id`` is omitted, a simple status message is
+    returned instead.
+    """
+
     if device_id:
         path = f"{device_id}_metrics.json"
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
+                # load all lines and return the most recent entry
                 data = [json.loads(line) for line in f if line.strip()]
-            return {"device_id": device_id, "metrics": data}
-        return {"device_id": device_id, "metrics": []}
+            if data:
+                return data[-1]
+        return {}
+
     return {
         "message": "aiortc inference server",
         "hint": "add ?device_id=<id> query parameter to fetch metrics",

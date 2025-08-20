@@ -145,6 +145,7 @@ if (IS_WORKER) {
     const detections = postprocess(tensor.data as Float32Array);
     const inference_ts = performance.now();
     ctx.postMessage({
+      type: 'result',
       frame_id: msg.frame_id,
       capture_ts: msg.capture_ts,
       inference_ts,
@@ -176,7 +177,10 @@ if (IS_WORKER) {
     } else {
       const msg = data;
       if (busy) {
-        if (queued) closeBitmap(queued.bitmap);
+        if (queued) {
+          ctx.postMessage({ type: 'dropped', frame_id: queued.frame_id });
+          closeBitmap(queued.bitmap);
+        }
         queued = msg; // replace queued frame
       } else {
         process(msg);
@@ -198,7 +202,7 @@ export interface InferenceOutput {
 
 let worker: Worker | null = null;
 let nextFrameId = 0;
-const pending = new Map<number, (msg: InferenceOutput) => void>();
+const pending = new Map<number, (msg: InferenceOutput | null) => void>();
 let warmupResolver: (() => void) | null = null;
 
 function getWorker(): Worker {
@@ -215,6 +219,12 @@ function getWorker(): Worker {
       if (data.type === 'warmup-done') {
         warmupResolver?.();
         warmupResolver = null;
+      } else if (data.type === 'dropped') {
+        const resolver = pending.get(data.frame_id);
+        if (resolver) {
+          pending.delete(data.frame_id);
+          resolver(null);
+        }
       } else {
         const resolver = pending.get(data.frame_id);
         if (resolver) {
@@ -235,7 +245,7 @@ function warmupImpl(): Promise<void> {
   });
 }
 
-function inferImpl(bitmap: ImageBitmap | OffscreenCanvas): Promise<InferenceOutput> {
+function inferImpl(bitmap: ImageBitmap | OffscreenCanvas): Promise<InferenceOutput | null> {
   const w = getWorker();
   const frame_id = nextFrameId++;
   const capture_ts = performance.now();

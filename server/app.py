@@ -75,6 +75,8 @@ async def offer(request: Request, device_id: str = Query(...)):
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
                 detections = tracker.update(detections)
+                # Log detections for visibility in server output
+                print(f"Frame {frame_id} detections: {detections}")
                 inference_ts = int(time.time() * 1000)
                 message = {
                     "frame_id": frame_id,

@@ -3,6 +3,7 @@ export interface Detection {
   y: number; // normalized top-left y
   w: number; // normalized width
   h: number; // normalized height
+  id?: number;
   label?: string;
   score?: number;
 }

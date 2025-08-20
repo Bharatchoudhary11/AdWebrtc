@@ -24,7 +24,14 @@ const VideoCanvas = forwardRef<HTMLVideoElement, Props>(({ stream, detections },
   useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    if (!canvas || !video) return;
+    if (
+      !canvas ||
+      !video ||
+      video.videoWidth === 0 ||
+      video.videoHeight === 0
+    ) {
+      return;
+    }
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 

@@ -15,7 +15,11 @@ import type { Detection } from './overlay';
 const MODEL_URL = new URL(/* @vite-ignore */ '../models/yolov5n.onnx', import.meta.url).toString();
 
 /** Dimensions expected by the model. */
-const SIZE = { width: 320, height: 240 } as const;
+// Model expects dimensions that are multiples of 32 to avoid shape mismatches
+// in the network. A height of 240 was causing ONNXRuntime to throw errors due
+// to incompatible concat shapes (15 vs 16). Use 256 which satisfies the
+// requirement while keeping the width at 320.
+const SIZE = { width: 320, height: 256 } as const;
 
 // ---------------------------------------------------------------------------
 // Worker implementation
@@ -71,7 +75,12 @@ if (IS_WORKER) {
   function preprocess(src: ImageBitmap | OffscreenCanvas): Tensor {
     const canvas = new OffscreenCanvas(SIZE.width, SIZE.height);
     const c = canvas.getContext('2d')!;
-    c.drawImage(src as any, 0, 0, SIZE.width, SIZE.height);
+    // Some browsers may hand us a bitmap with zero width/height if a frame is
+    // captured before the video element is ready. Avoid calling drawImage on
+    // such bitmaps as it would throw an InvalidStateError.
+    if (src.width > 0 && src.height > 0) {
+      c.drawImage(src as any, 0, 0, SIZE.width, SIZE.height);
+    }
     const rgba = c.getImageData(0, 0, SIZE.width, SIZE.height).data;
 
     const pixelCount = SIZE.width * SIZE.height;

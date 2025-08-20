@@ -29,7 +29,10 @@ export default function App() {
       const constraints: MediaStreamConstraints = {
         video: {
           width: lowRes ? 320 : 640,
-          height: lowRes ? 240 : 480,
+          // Height of 240 caused zero-dimension frames which in turn led to
+          // canvas drawImage errors and ONNXRuntime shape mismatches. Use 256
+          // which is divisible by 32 and matches the worker's expectations.
+          height: lowRes ? 256 : 480,
           frameRate: 30
         },
         audio: false
@@ -105,18 +108,24 @@ export default function App() {
       if (!active) return;
       if (now - last > interval) {
         last = now;
-        const bitmap = await captureFrame();
-        if (bitmap) {
-          infer(bitmap).then(output => {
-            if (output) {
-              const { capture_ts, inference_ts, detections } = output;
-              setDetections(detections);
-              metricsRef.current.record(capture_ts, inference_ts);
-              frameCountRef.current++;
-            }
-          }).catch(err => {
-            console.error(err);
-          });
+        // Wait for the video element to have valid dimensions before attempting
+        // to capture a frame. This prevents repeated "Video not ready" warnings
+        // and zero-sized OffscreenCanvas errors.
+        const vid = videoRef.current;
+        if (vid && vid.readyState >= 2) {
+          const bitmap = await captureFrame();
+          if (bitmap) {
+            infer(bitmap).then(output => {
+              if (output) {
+                const { capture_ts, inference_ts, detections } = output;
+                setDetections(detections);
+                metricsRef.current.record(capture_ts, inference_ts);
+                frameCountRef.current++;
+              }
+            }).catch(err => {
+              console.error(err);
+            });
+          }
         }
       }
       requestAnimationFrame(loop);
@@ -182,7 +191,7 @@ export default function App() {
     }
     const canvas = document.createElement('canvas');
     const w = lowRes ? 320 : video.videoWidth;
-    const h = lowRes ? 240 : video.videoHeight;
+    const h = lowRes ? 256 : video.videoHeight;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');

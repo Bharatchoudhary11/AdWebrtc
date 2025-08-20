@@ -204,9 +204,12 @@ let warmupResolver: (() => void) | null = null;
 function getWorker(): Worker {
   if (IS_WORKER) throw new Error('getWorker called inside worker');
   if (!worker) {
-    // Indirection so bundlers don't evaluate worker creation for worker build.
-    const WorkerCtor = Worker as { new (url: string | URL, opts: WorkerOptions): Worker };
-    worker = new WorkerCtor(import.meta.url, { type: 'module' });
+    // Use an explicit URL so bundlers generate a separate worker chunk.
+    // Pointing to this same file lets us keep worker and main thread logic
+    // together while ensuring the worker code runs in an isolated context.
+    worker = new Worker(new URL('./wasm_infer.ts', import.meta.url), {
+      type: 'module'
+    });
     worker.onmessage = ev => {
       const data = ev.data;
       if (data.type === 'warmup-done') {

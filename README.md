@@ -12,6 +12,23 @@ docker compose up --build
 ```
 This exposes the Vite app at http://localhost:3000 and the AIORTC backend at http://localhost:8000. For remote phone access over HTTPS, run a tunnel such as `ngrok http 3000` and use the forwarded URL.
 
+### Serving the web app over HTTPS
+
+Mobile browsers require a secure origin for `getUserMedia`. When accessing the app via a LAN IP (e.g. `http://10.0.0.5:3000`), the camera will be blocked on plain HTTP. The bundled web server can run over HTTPS by providing a certificate:
+
+```bash
+cd web
+SSL_KEY=path/to/key.pem SSL_CERT=path/to/cert.pem HTTPS=true npm run dev
+```
+
+Generate a self-signed cert for development with `openssl`:
+
+```bash
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem
+```
+
+The QR code will automatically use `https://` for non-local hosts.
+
 ## One-command start
 ```bash
 git clone <this-repo>

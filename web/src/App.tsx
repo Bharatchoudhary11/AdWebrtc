@@ -14,7 +14,12 @@ export default function App() {
   const [lowRes, setLowRes] = useState(true);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [serverDown, setServerDown] = useState(false);
-  const [joinUrl, setJoinUrl] = useState(() => window.location.origin);
+  const [joinUrl, setJoinUrl] = useState(() => {
+    const loc = window.location
+    const isLocalHost = ['localhost', '127.0.0.1'].includes(loc.hostname)
+    const proto = !isLocalHost && loc.protocol === 'http:' ? 'https:' : loc.protocol
+    return `${proto}//${loc.host}`
+  });
   const metricsRef = useRef(new Metrics());
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -223,7 +228,16 @@ export default function App() {
       .then(res => (res.ok ? res.text() : ''))
       .then(text => {
         const t = text.trim();
-        if (t) setJoinUrl(t);
+        if (t) {
+          try {
+            const u = new URL(t)
+            const isLocal = ['localhost', '127.0.0.1'].includes(u.hostname)
+            if (!isLocal && u.protocol === 'http:') u.protocol = 'https:'
+            setJoinUrl(u.toString())
+          } catch {
+            setJoinUrl(t)
+          }
+        }
       })
       .catch(() => {});
   }, []);

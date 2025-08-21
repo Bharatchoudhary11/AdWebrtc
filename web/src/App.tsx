@@ -43,16 +43,24 @@ export default function App() {
         },
         audio: false
       };
-      if (
-        !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
-      ) {
-        console.error('getUserMedia is not supported in this browser');
+      const mediaDevices = navigator.mediaDevices;
+      const getUserMedia = mediaDevices?.getUserMedia
+        || (navigator as any).getUserMedia
+        || (navigator as any).webkitGetUserMedia
+        || (navigator as any).mozGetUserMedia;
+
+      if (!window.isSecureContext || !getUserMedia) {
+        console.error('getUserMedia requires HTTPS or localhost');
         setServerDown(true);
         return;
       }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = mediaDevices?.getUserMedia
+          ? await mediaDevices.getUserMedia(constraints)
+          : await new Promise<MediaStream>((resolve, reject) =>
+              getUserMedia.call(navigator, constraints, resolve, reject)
+            );
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(t => t.stop());
         }

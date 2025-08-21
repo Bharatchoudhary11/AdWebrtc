@@ -10,8 +10,11 @@ export interface DetectionMessage {
 
 // Base URL for the inference server. Using the same value everywhere ensures
 // that the frontend consistently talks to the correct backend port regardless
-// of the current origin (e.g. dev server on 3000).
-export const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
+// of the current origin (e.g. dev server on 3000). Allow overriding via
+// window.SERVER_URL so deployments can specify a custom endpoint or protocol.
+export const SERVER_URL =
+  (window as any).SERVER_URL ||
+  `${window.location.protocol}//${window.location.hostname}:8000`;
 
 export async function initWebRTC(
   stream: MediaStream,

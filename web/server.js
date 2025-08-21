@@ -24,7 +24,10 @@ app.use((req, res, next) => {
 // expose MODE to browser
 app.get('/env.js', (req, res) => {
   const mode = process.env.MODE || 'wasm'
-  res.type('application/javascript').send(`window.MODE="${mode}";`)
+  const serverUrl = process.env.SERVER_URL || ''
+  const lines = [`window.MODE="${mode}";`]
+  if (serverUrl) lines.push(`window.SERVER_URL="${serverUrl}";`)
+  res.type('application/javascript').send(lines.join('\n'))
 })
 
 // Simple metrics aggregator keyed by device ID

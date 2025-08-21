@@ -6,6 +6,19 @@ export interface MetricSummary {
   p95: number;
 }
 
+export interface LatencySummary {
+  e2e: MetricSummary;
+  server: MetricSummary;
+  network: MetricSummary;
+}
+
+const summarize = (arr: number[]): MetricSummary => {
+  const s = [...arr].sort((a, b) => a - b);
+  const q = (p: number) =>
+    s.length ? s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))] : 0;
+  return { count: s.length, p50: q(0.5), p95: q(0.95) };
+};
+
 export class Metrics {
   private e2e: number[] = [];
   private server: number[] = [];
@@ -39,24 +52,15 @@ export class Metrics {
     }
   }
 
-  summary(): MetricSummary {
-    const arr = [...this.e2e].sort((a, b) => a - b);
-    const q = (p: number) =>
-      arr.length ? arr[Math.min(arr.length - 1, Math.floor(p * (arr.length - 1)))] : 0;
+  summary(): LatencySummary {
     return {
-      count: arr.length,
-      p50: q(0.5),
-      p95: q(0.95)
+      e2e: summarize(this.e2e),
+      server: summarize(this.server),
+      network: summarize(this.network),
     };
   }
 
   toJSON() {
-    const summarize = (arr: number[]): MetricSummary => {
-      const s = [...arr].sort((a, b) => a - b);
-      const q = (p: number) =>
-        s.length ? s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))] : 0;
-      return { count: s.length, p50: q(0.5), p95: q(0.95) };
-    };
     return {
       e2e_latency_ms: summarize(this.e2e),
       server_latency_ms: summarize(this.server),

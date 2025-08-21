@@ -2,6 +2,8 @@ import express from 'express'
 import { WebSocketServer } from 'ws'
 import path from 'path'
 import http from 'http'
+import https from 'https'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import getPort, { portNumbers } from 'get-port'
 import mime from 'mime'
@@ -123,8 +125,22 @@ app.post('/api/bench/push', (req, res) => {
 app.use(express.static(path.join(__dirname, 'dist')))
 app.use(express.static(path.join(__dirname, 'public')))
 
-// ----- SINGLE HTTP SERVER + WS on same port -----
-const httpServer = http.createServer(app)
+// ----- SINGLE HTTP/HTTPS SERVER + WS on same port -----
+// Allow serving over HTTPS when SSL cert/key are provided. Browsers block
+// camera/mic access on plain HTTP for non-localhost origins, so enabling HTTPS
+// lets phones join via IP without getUserMedia failures.
+let httpServer
+if (process.env.HTTPS === 'true') {
+  const keyPath = process.env.SSL_KEY || path.join(__dirname, 'cert', 'key.pem')
+  const certPath = process.env.SSL_CERT || path.join(__dirname, 'cert', 'cert.pem')
+  const options = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
+  }
+  httpServer = https.createServer(options, app)
+} else {
+  httpServer = http.createServer(app)
+}
 const wss = new WebSocketServer({ server: httpServer, path: '/signal' })
 
 let peers = []
@@ -141,7 +157,8 @@ const preferred = Number(process.env.PORT) || 3000
 const port = await getPort({ port: portNumbers(preferred, preferred + 100) })
 
 httpServer.listen(port, '0.0.0.0', () => {
-  console.log(`Web server listening on http://0.0.0.0:${port}`)
+  const proto = process.env.HTTPS === 'true' ? 'https' : 'http'
+  console.log(`Web server listening on ${proto}://0.0.0.0:${port}`)
 })
 
 // helpful debug

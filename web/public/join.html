@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Camera Join</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    button {
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 12px 24px;
+      font-size: 16px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .preview {
+      width: 100%;
+      max-width: 320px;
+      height: 240px;
+      background-color: #f0f0f0;
+      margin: 20px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .status {
+      margin-top: 16px;
+      font-weight: bold;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Join as Camera</h1>
+  <p>Share your camera with the desktop viewer</p>
+  
+  <div class="preview">
+    <video id="preview" autoplay muted playsinline></video>
+  </div>
+  
+  <button id="joinBtn">Join as Camera</button>
+  <div id="status" class="status hidden">Connecting...</div>
+
+  <script>
+    // Define constants needed for WebRTC connection
+    const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
+    
+    const joinBtn = document.getElementById('joinBtn');
+    const preview = document.getElementById('preview');
+    const status = document.getElementById('status');
+    let stream = null;
+    
+    // Generate a unique browser ID and store it in localStorage
+    function generateUniqueId() {
+      return 'browser_' + Math.random().toString(36).substring(2, 15) + 
+             Math.random().toString(36).substring(2, 15) + 
+             '_' + Date.now();
+    }
+
+    // Get or create a unique browser ID
+    function getBrowserId() {
+      const storageKey = 'webrtc_vlm_browser_id';
+      let id = localStorage.getItem(storageKey);
+      
+      if (!id) {
+        id = generateUniqueId();
+        localStorage.setItem(storageKey, id);
+      }
+      
+      return id;
+    }
+
+    // Get the browser ID
+    const browserId = getBrowserId();
+    
+    // Initialize WebRTC connection function
+    async function initWebRTC(stream, onMessage) {
+      const pc = new RTCPeerConnection();
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+      pc.ondatachannel = ev => {
+        if (ev.channel.label === 'detections') {
+          ev.channel.onmessage = e => {
+            onMessage(JSON.parse(e.data));
+          };
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const res = await fetch(`${SERVER_URL}/offer?device_id=${encodeURIComponent(browserId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: offer.sdp || ''
+      });
+      const answer = await res.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+
+      return pc;
+    }
+    
+    joinBtn.addEventListener('click', async () => {
+      try {
+        // Request camera access
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 320 },
+            height: { ideal: 256 },
+            frameRate: { ideal: 30 }
+          },
+          audio: false
+        });
+        
+        // Show preview
+        preview.srcObject = stream;
+        await preview.play();
+        
+        // Update UI
+        joinBtn.classList.add('hidden');
+        status.classList.remove('hidden');
+        status.textContent = 'Connecting...';
+        
+        // Initialize WebRTC connection
+        const pc = await initWebRTC(stream, () => {});
+        
+        // Update status when connection state changes
+        pc.onconnectionstatechange = () => {
+          status.textContent = `Connection: ${pc.connectionState}`;
+          if (pc.connectionState === 'connected') {
+            status.textContent = 'Connected! Streaming camera to desktop.';
+          } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            status.textContent = 'Connection failed. Please try again.';
+            joinBtn.classList.remove('hidden');
+          }
+        };
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        status.classList.remove('hidden');
+        status.textContent = `Error: ${err.message || 'Could not access camera'}`;
+      }
+    });
+  </script>
+</body>
+</html>

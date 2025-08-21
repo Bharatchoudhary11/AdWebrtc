@@ -25,7 +25,9 @@ class Detector:
         providers = ["CPUExecutionProvider"]
         self.session = ort.InferenceSession(self.model_path, providers=providers)
         self.input_name = self.session.get_inputs()[0].name
-        self.size = (320, 240)  # width, height
+        # Model expects dimensions that are multiples of 32 to avoid shape mismatches
+        # in the network. Change from (320, 240) to (320, 256) to fix the concat error
+        self.size = (320, 256)  # width, height
 
         # Load labels for converting class indices to human readable strings.
         labels_path = os.path.join(os.path.dirname(__file__), "labels_coco80.txt")

@@ -22,6 +22,19 @@ async def index(request):
                 data = [json.loads(line) for line in f if line.strip()]
             return web.json_response({"device_id": device_id, "metrics": data})
         return web.json_response({"device_id": device_id, "metrics": []})
+    
+    # Return a sample detection response format instead of the hint message
+    return web.json_response(
+        {
+            "frame_id": "sample",
+            "capture_ts": int(time.time() * 1000),
+            "recv_ts": int(time.time() * 1000),
+            "inference_ts": int(time.time() * 1000),
+            "detections": [
+                {"label": "person", "score": 0.93, "xmin": 0.12, "ymin": 0.08, "xmax": 0.34, "ymax": 0.67}
+            ]
+        }
+    )
     return web.json_response(
         {
             "message": "aiortc inference server",

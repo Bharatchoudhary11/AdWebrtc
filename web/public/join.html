@@ -121,15 +121,36 @@
     
     joinBtn.addEventListener('click', async () => {
       try {
+        const mediaDevices = navigator.mediaDevices;
+        const getUserMedia = mediaDevices?.getUserMedia
+          || navigator.getUserMedia
+          || navigator.webkitGetUserMedia
+          || navigator.mozGetUserMedia;
+
+        if (!window.isSecureContext || !getUserMedia) {
+          throw new Error('getUserMedia requires HTTPS or localhost');
+        }
+
         // Request camera access
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 320 },
-            height: { ideal: 256 },
-            frameRate: { ideal: 30 }
-          },
-          audio: false
-        });
+        stream = mediaDevices?.getUserMedia
+          ? await mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 320 },
+                height: { ideal: 256 },
+                frameRate: { ideal: 30 }
+              },
+              audio: false
+            })
+          : await new Promise((resolve, reject) =>
+              getUserMedia.call(navigator, {
+                video: {
+                  width: { ideal: 320 },
+                  height: { ideal: 256 },
+                  frameRate: { ideal: 30 }
+                },
+                audio: false
+              }, resolve, reject)
+            );
         
         // Show preview
         preview.srcObject = stream;

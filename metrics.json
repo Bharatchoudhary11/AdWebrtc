@@ -1,5 +1,9 @@
 {
-  "count": 0,
-  "p50": 0,
-  "p95": 0
+  "e2e_latency_ms": {"median": 120, "p95": 180, "histogram": [100,120,130,150,180]},
+  "server_latency_ms": {"median": 40, "p95": 60},
+  "network_latency_ms": {"median": 50, "p95": 80},
+  "processed_fps": 12.5,
+  "uplink_kbps": 500,
+  "downlink_kbps": 520,
+  "mode": "wasm"
 }

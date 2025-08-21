@@ -58,6 +58,7 @@ async def offer(request):
 
     pc = RTCPeerConnection()
     pcs.add(pc)
+    print(f"Browser connected: {device_id or 'unknown'}, total browsers: {len(pcs)}")
 
     detections_channel = pc.createDataChannel("detections")
     metrics_path = f"{device_id}_metrics.json" if device_id else None
@@ -88,8 +89,11 @@ async def offer(request):
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
                 detections = tracker.update(detections)
-                # Log detections for visibility in server output
-                print(f"Frame {frame_id} detections: {detections}")
+                # Log detections with device and active browser count
+                print(
+                    f"[Device {device_id or 'unknown'}] Frame {frame_id} detections: {detections} "
+                    f"(total browsers: {len(pcs)})"
+                )
                 inference_ts = int(time.time() * 1000)
                 message = {
                     "frame_id": frame_id,
@@ -109,6 +113,7 @@ async def offer(request):
         if pc.connectionState in ("failed", "closed"):
             await pc.close()
             pcs.discard(pc)
+            print(f"Browser disconnected: {device_id or 'unknown'}, total browsers: {len(pcs)}")
             if metrics_file:
                 metrics_file.close()
 

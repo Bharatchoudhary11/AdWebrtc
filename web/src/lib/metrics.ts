@@ -13,9 +13,11 @@ export class Metrics {
 
   record(sent: number, received: number, extra?: { server?: number; network?: number }) {
     const latency = received - sent;
+    const srv = extra?.server ?? latency;
+    const net = extra?.network ?? 0;
     this.e2e.push(latency);
-    if (typeof extra?.server === 'number') this.server.push(extra.server);
-    if (typeof extra?.network === 'number') this.network.push(extra.network);
+    this.server.push(srv);
+    this.network.push(net);
     // Best-effort push to backend bench aggregator. Ignore failures so normal
     // operation is unaffected if the endpoint is missing (e.g. outside bench
     // runs). Only attempt this when building for production to avoid noisy
@@ -24,9 +26,9 @@ export class Metrics {
       const payload: Record<string, number | string> = {
         device_id: deviceId,
         e2e: latency,
+        server_latency_ms: srv,
+        network_latency_ms: net,
       };
-      if (typeof extra?.server === 'number') payload.server_latency_ms = extra.server;
-      if (typeof extra?.network === 'number') payload.network_latency_ms = extra.network;
       void fetch('/api/bench/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

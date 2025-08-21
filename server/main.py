@@ -31,14 +31,15 @@ async def index(request):
             "recv_ts": int(time.time() * 1000),
             "inference_ts": int(time.time() * 1000),
             "detections": [
-                {"label": "person", "score": 0.93, "xmin": 0.12, "ymin": 0.08, "xmax": 0.34, "ymax": 0.67}
-            ]
-        }
-    )
-    return web.json_response(
-        {
-            "message": "aiortc inference server",
-            "hint": "add ?device_id=<id> query parameter to fetch metrics",
+                {
+                    "label": "person",
+                    "score": 0.93,
+                    "xmin": 0.12,
+                    "ymin": 0.08,
+                    "xmax": 0.34,
+                    "ymax": 0.67,
+                }
+            ],
         }
     )
 

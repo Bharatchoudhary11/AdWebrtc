@@ -18,18 +18,14 @@ app.add_middleware(
 
 pcs = set()
 detector = Detector()
+device_metrics: dict[str, list[dict]] = {}
 
 
 @app.get("/")
 async def index(device_id: str | None = None):
     """Return server status or metrics for a specific device."""
     if device_id:
-        path = f"{device_id}_metrics.json"
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = [json.loads(line) for line in f if line.strip()]
-            return {"device_id": device_id, "metrics": data}
-        return {"device_id": device_id, "metrics": []}
+        return {"device_id": device_id, "metrics": device_metrics.get(device_id, [])}
     
     # Generate a dynamic detection response with real detections
     current_time = int(time.time() * 1000)
@@ -114,8 +110,7 @@ async def offer(request: Request, device_id: str = Query(...)):
     pcs.add(pc)
 
     detections_channel = pc.createDataChannel("detections")
-    metrics_path = f"{device_id}_metrics.json"
-    metrics_file = open(metrics_path, "a", encoding="utf-8")
+    device_metrics.setdefault(device_id, [])
 
     @pc.on("track")
     async def on_track(track):
@@ -162,8 +157,7 @@ async def offer(request: Request, device_id: str = Query(...)):
                     "detections": detections,
                 }
                 print(json.dumps(message))
-                metrics_file.write(json.dumps(message) + "\n")
-                metrics_file.flush()
+                device_metrics[device_id].append(message)
                 if detections_channel.readyState == "open":
                     detections_channel.send(json.dumps(message))
 
@@ -172,7 +166,6 @@ async def offer(request: Request, device_id: str = Query(...)):
         if pc.connectionState in ("failed", "closed"):
             await pc.close()
             pcs.discard(pc)
-            metrics_file.close()
 
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()

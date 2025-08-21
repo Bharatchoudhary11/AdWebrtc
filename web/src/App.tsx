@@ -134,16 +134,19 @@ export default function App() {
         if (vid && vid.readyState >= 2) {
           const bitmap = await captureFrame();
           if (bitmap) {
-            infer(bitmap).then(output => {
-              if (output) {
-                const { capture_ts, inference_ts, detections } = output;
-                setDetections(detections);
-                metricsRef.current.record(capture_ts, inference_ts);
-                frameCountRef.current++;
-              }
-            }).catch(err => {
-              console.error(err);
-            });
+            infer(bitmap)
+              .then(output => {
+                if (output) {
+                  const { capture_ts, detections } = output;
+                  const inference_ts = performance.now();
+                  setDetections(detections);
+                  metricsRef.current.record(capture_ts, inference_ts);
+                  frameCountRef.current++;
+                }
+              })
+              .catch(err => {
+                console.error(err);
+              });
           }
         }
       }

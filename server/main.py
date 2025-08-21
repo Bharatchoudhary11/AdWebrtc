@@ -89,11 +89,6 @@ async def offer(request):
                 recv_ts = int(time.time() * 1000)
                 detections = detector.run(frame)
                 detections = tracker.update(detections)
-                # Log detections with device and active browser count
-                print(
-                    f"[Device {device_id or 'unknown'}] Frame {frame_id} detections: {detections} "
-                    f"(total browsers: {len(pcs)})"
-                )
                 inference_ts = int(time.time() * 1000)
                 message = {
                     "frame_id": frame_id,
@@ -102,6 +97,9 @@ async def offer(request):
                     "inference_ts": inference_ts,
                     "detections": detections,
                 }
+                # Print device ID followed by the detection message
+                print(device_id or "unknown")
+                print(json.dumps(message))
                 if metrics_file:
                     metrics_file.write(json.dumps(message) + "\n")
                     metrics_file.flush()

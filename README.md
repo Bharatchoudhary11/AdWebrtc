@@ -61,6 +61,7 @@ Then open **http://localhost:3000** on your laptop. A QR code appears — scan i
 - **Per-frame JSON (server → client)** over WS in server mode:
   ```json
   {
+    "device_id": "browser_id",
     "frame_id": "string_or_int",
     "capture_ts": 1690000000000,
     "recv_ts": 1690000000100,

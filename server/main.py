@@ -26,6 +26,7 @@ async def index(request):
     # Return a sample detection response format instead of the hint message
     return web.json_response(
         {
+            "device_id": "sample_device",
             "frame_id": "sample",
             "capture_ts": int(time.time() * 1000),
             "recv_ts": int(time.time() * 1000),
@@ -92,14 +93,13 @@ async def offer(request):
                 detections = tracker.update(detections)
                 inference_ts = int(time.time() * 1000)
                 message = {
+                    "device_id": device_id or "unknown",
                     "frame_id": frame_id,
                     "capture_ts": capture_ts,
                     "recv_ts": recv_ts,
                     "inference_ts": inference_ts,
                     "detections": detections,
                 }
-                # Print device ID followed by the detection message
-                print(device_id or "unknown")
                 print(json.dumps(message))
                 if metrics_file:
                     metrics_file.write(json.dumps(message) + "\n")

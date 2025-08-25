@@ -88,11 +88,12 @@ async def index(device_id: str | None = None):
         }]
     
     return {
+        "device_id": "sample_device",
         "frame_id": current_time,
         "capture_ts": current_time - 120,
         "recv_ts": recv_ts,
         "inference_ts": inference_ts,
-        "detections": detections
+        "detections": detections,
     }
 
 
@@ -150,6 +151,7 @@ async def offer(request: Request, device_id: str = Query(...)):
                 ]
                 inference_ts = int(time.time() * 1000)
                 message = {
+                    "device_id": device_id,
                     "frame_id": frame_id,
                     "capture_ts": capture_ts,
                     "recv_ts": recv_ts,

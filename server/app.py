@@ -23,8 +23,14 @@ device_metrics: dict[str, list[dict]] = {}
 
 @app.get("/")
 async def index(device_id: str | None = None):
-    """Return server status or metrics for a specific device."""
-    if device_id:
+    """Return sample detection or stored metrics for a device.
+
+    If metrics have been recorded for the requested ``device_id`` they are
+    returned. Otherwise a sample detection payload is generated with the
+    provided ``device_id`` (falling back to ``"sample_device"`` when not
+    specified).
+    """
+    if device_id and device_id in device_metrics:
         return {"device_id": device_id, "metrics": device_metrics.get(device_id, [])}
     
     # Generate a dynamic detection response with real detections
@@ -88,7 +94,7 @@ async def index(device_id: str | None = None):
         }]
     
     return {
-        "device_id": "sample_device",
+        "device_id": device_id or "sample_device",
         "frame_id": current_time,
         "capture_ts": current_time - 120,
         "recv_ts": recv_ts,

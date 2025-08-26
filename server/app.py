@@ -26,10 +26,16 @@ async def index(device_id: str | None = None):
     """Return sample detection or stored metrics for a device.
 
     If metrics have been recorded for the requested ``device_id`` they are
-    returned. Otherwise a sample detection payload is generated with the
-    provided ``device_id`` (falling back to ``"sample_device"`` when not
-    specified).
+    returned. When no ``device_id`` is provided the first known device (if
+    any) is used. Otherwise a sample detection payload is generated with the
+    provided ``device_id`` (falling back to ``"sample_device"`` when none is
+    available).
     """
+    if not device_id and device_metrics:
+        # Default to the first device that has reported metrics so the client
+        # doesn't have to explicitly provide its identifier.
+        device_id = next(iter(device_metrics))
+
     if device_id and device_id in device_metrics:
         return {"device_id": device_id, "metrics": device_metrics.get(device_id, [])}
     

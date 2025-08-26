@@ -15,6 +15,15 @@ detector = Detector()
 async def index(request):
     """Return server status or metrics for a specific device."""
     device_id = request.query.get("device_id")
+
+    if not device_id:
+        # Try to infer a device ID from existing metric files if one wasn't
+        # explicitly requested.
+        for fname in os.listdir("."):
+            if fname.endswith("_metrics.json"):
+                device_id = fname.removesuffix("_metrics.json")
+                break
+
     if device_id:
         path = f"{device_id}_metrics.json"
         if os.path.exists(path):
@@ -22,11 +31,11 @@ async def index(request):
                 data = [json.loads(line) for line in f if line.strip()]
             return web.json_response({"device_id": device_id, "metrics": data})
         return web.json_response({"device_id": device_id, "metrics": []})
-    
-    # Return a sample detection response format instead of the hint message
+
+    # Return a sample detection response format when no metrics are available
     return web.json_response(
         {
-            "device_id": "sample_device",
+            "device_id": device_id or "sample_device",
             "frame_id": "sample",
             "capture_ts": int(time.time() * 1000),
             "recv_ts": int(time.time() * 1000),

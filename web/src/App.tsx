@@ -13,6 +13,7 @@ const MODE = import.meta.env.VITE_MODE as 'wasm' | 'server';
 export default function App() {
   const [lowRes, setLowRes] = useState(true);
   const [detections, setDetections] = useState<Detection[]>([]);
+  const [events, setEvents] = useState<string[]>([]);
   const [serverDown, setServerDown] = useState(false);
   const [joinUrl, setJoinUrl] = useState(() => {
     const loc = window.location
@@ -82,6 +83,9 @@ export default function App() {
           }
           pcRef.current = await initWebRTC(stream, msg => {
             setDetections(msg.detections);
+            if (msg.detections.some(d => d.label && ['left', 'right'].includes(d.label.toLowerCase()))) {
+              setEvents(e => [...e, 'User is looking away']);
+            }
             const sent = msg.capture_ts ?? msg.recv_ts ?? performance.now();
             const now = performance.now();
             const serverLatency =
@@ -140,6 +144,9 @@ export default function App() {
                   const { capture_ts, detections } = output;
                   const inference_ts = performance.now();
                   setDetections(detections);
+                  if (detections.some(d => d.label && ['left', 'right'].includes(d.label.toLowerCase()))) {
+                    setEvents(e => [...e, 'User is looking away']);
+                  }
                   metricsRef.current.record(capture_ts, inference_ts);
                   frameCountRef.current++;
                 }
@@ -273,6 +280,14 @@ export default function App() {
         <button onClick={saveMetrics}>Save metrics</button>
       </div>
       <StatsPanel metrics={metricsRef.current.summary()} />
+      <div>
+        <h3>Event log</h3>
+        <ul>
+          {events.map((e, i) => (
+            <li key={i}>{e}</li>
+          ))}
+        </ul>
+      </div>
       <QRJoin url={joinUrl} />
     </div>
   );

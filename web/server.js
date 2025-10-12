@@ -104,6 +104,69 @@ app.get('/bench-stop', benchStop)
 app.post('/api/bench/reset', benchStart)
 app.get('/api/bench/dump', benchStop)
 
+// ---------------------------------------------------------------------------
+// Simple credential issuance helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Persist issued credentials in-memory so the UI can query them after the
+ * initial POST succeeds. This keeps the implementation lightweight while still
+ * allowing the front-end to surface previously issued credentials.
+ */
+const issuedCredentials = new Map()
+
+const generateCredentialId = () =>
+  `cred_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+
+const sanitizeClaims = (claims) => {
+  if (!claims || typeof claims !== 'object') return {}
+  const out = {}
+  for (const [key, value] of Object.entries(claims)) {
+    if (typeof value === 'object') {
+      out[key] = sanitizeClaims(value)
+    } else if (value !== undefined) {
+      out[key] = value
+    }
+  }
+  return out
+}
+
+app.post('/api/credentials', (req, res) => {
+  const { subject, claims, issuer } = req.body || {}
+
+  if (typeof subject !== 'string' || !subject.trim()) {
+    return res.status(400).json({ error: 'subject is required' })
+  }
+
+  const issuedAt = new Date().toISOString()
+  const id = generateCredentialId()
+
+  const credential = {
+    id,
+    issuer: issuer || 'https://localhost:4000',
+    subject: subject.trim(),
+    issuedAt,
+    claims: sanitizeClaims(claims),
+  }
+
+  issuedCredentials.set(id, credential)
+
+  return res.status(201).json({ credential })
+})
+
+app.get('/api/credentials', (_req, res) => {
+  const credentials = Array.from(issuedCredentials.values())
+  res.json({ credentials })
+})
+
+app.get('/api/credentials/:id', (req, res) => {
+  const credential = issuedCredentials.get(req.params.id)
+  if (!credential) {
+    return res.status(404).json({ error: 'Credential not found' })
+  }
+  res.json({ credential })
+})
+
 app.post('/api/bench/push', (req, res) => {
   const { device_id, e2e, fps, kbps_up, kbps_down, server_latency_ms, network_latency_ms } = req.body || {}
   const id = device_id || req.headers['user-agent'] || 'unknown'
